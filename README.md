@@ -21,12 +21,12 @@ uv pip install -e .[chat_with_repo]
 ```
 
 ## Usage
-PapAIrus exposes the `papairusrun` entry point.
+PapAIrus exposes the `papairus` command (alias: `papairusrun`).
 
 ```bash
 export OPENAI_API_KEY=your_gemini_key
-papairusrun run --model gemini-3.5-flash --allow-main --telemetry
-papairusrun run --model gemma-local --dry-run
+papairus run --model gemini-3.5-flash --allow-main --telemetry
+papairus run --model gemma-local --dry-run
 ```
 
 Options:
@@ -37,8 +37,8 @@ Options:
 
 Cleaning and diff helpers:
 ```bash
-papairusrun clean
-papairusrun diff
+papairus clean
+papairus diff
 ```
 
 ## Development notes

@@ -33,6 +33,7 @@ dependencies = [
 repository = "https://github.com/OpenBMB/RepoAgent"
 
 [project.scripts]
+papairus = "repo_agent.main:cli"
 papairusrun = "repo_agent.main:cli"
 install-hooks = "pre_commit.commands.install:install"
 
