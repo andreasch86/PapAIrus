@@ -20,11 +20,11 @@ from colorama import Fore, Style
 from prettytable import PrettyTable
 from tqdm import tqdm
 
-from repo_agent.file_handler import FileHandler
-from repo_agent.log import logger
-from repo_agent.multi_task_dispatch import Task, TaskManager
-from repo_agent.settings import SettingsManager
-from repo_agent.utils.meta_info_utils import latest_verison_substring
+from papairus.file_handler import FileHandler
+from papairus.log import logger
+from papairus.multi_task_dispatch import Task, TaskManager
+from papairus.settings import SettingsManager
+from papairus.utils.meta_info_utils import latest_verison_substring
 
 
 @unique
@@ -568,7 +568,7 @@ class MetaInfo:
                             f"Jedi find {now_obj.get_full_name()} with name_duplicate_reference, skipped"
                         )
                         continue
-                    # if now_obj.get_full_name() == "repo_agent/runner.py/Runner/run":
+                    # if now_obj.get_full_name() == "papairus/runner.py/Runner/run":
                     #     import pdb; pdb.set_trace()
                     if DocItem.has_ans_relation(now_obj, referencer_node) == None:
                         # English

@@ -1,7 +1,7 @@
 import json
 import sys
 
-from repo_agent.log import logger
+from papairus.log import logger
 
 
 class JsonFileProcessor:

@@ -4,11 +4,11 @@ import click
 import git
 from pydantic import ValidationError
 
-from repo_agent.doc_meta_info import DocItem, MetaInfo
-from repo_agent.log import logger, set_logger_level_from_config
-from repo_agent.runner import Runner
-from repo_agent.settings import LogLevel, SettingsManager
-from repo_agent.utils.meta_info_utils import delete_fake_files, make_fake_files
+from papairus.doc_meta_info import DocItem, MetaInfo
+from papairus.log import logger, set_logger_level_from_config
+from papairus.runner import Runner
+from papairus.settings import LogLevel, SettingsManager
+from papairus.utils.meta_info_utils import delete_fake_files, make_fake_files
 
 try:
     version_number = metadata.version("papairus")
@@ -290,7 +290,7 @@ def chat_with_repo():
         handle_setting_error(e)
         return
 
-    from repo_agent.chat_with_repo import main
+    from papairus.chat_with_repo import main
 
     main()
 

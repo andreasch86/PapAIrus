@@ -11,15 +11,15 @@ from pathlib import Path
 from colorama import Fore, Style
 from tqdm import tqdm
 
-from repo_agent.change_detector import ChangeDetector
-from repo_agent.chat_engine import ChatEngine
-from repo_agent.doc_meta_info import DocItem, DocItemStatus, MetaInfo, need_to_generate
-from repo_agent.file_handler import FileHandler
-from repo_agent.log import logger
-from repo_agent.multi_task_dispatch import worker
-from repo_agent.project_manager import ProjectManager
-from repo_agent.settings import SettingsManager
-from repo_agent.utils.meta_info_utils import delete_fake_files, make_fake_files
+from papairus.change_detector import ChangeDetector
+from papairus.chat_engine import ChatEngine
+from papairus.doc_meta_info import DocItem, DocItemStatus, MetaInfo, need_to_generate
+from papairus.file_handler import FileHandler
+from papairus.log import logger
+from papairus.multi_task_dispatch import worker
+from papairus.project_manager import ProjectManager
+from papairus.settings import SettingsManager
+from papairus.utils.meta_info_utils import delete_fake_files, make_fake_files
 
 
 class Runner:

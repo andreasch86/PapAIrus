@@ -1,4 +1,4 @@
-from repo_agent.doc_meta_info import (
+from papairus.doc_meta_info import (
     DocItem,
     DocItemStatus,
     DocItemType,

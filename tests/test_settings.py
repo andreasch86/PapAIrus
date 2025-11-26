@@ -1,7 +1,7 @@
 import pytest
 from pydantic import ValidationError
 
-from repo_agent.settings import ChatCompletionSettings, ProjectSettings, SettingsManager, LogLevel
+from papairus.settings import ChatCompletionSettings, ProjectSettings, SettingsManager, LogLevel
 
 
 def test_language_validation_accepts_uk_english():
@@ -89,4 +89,4 @@ def test_settings_manager_initialize_with_params_sets_instance(tmp_path):
 def test_settings_module_as_script():
     import runpy
 
-    runpy.run_module("repo_agent.settings", run_name="__main__")
+    runpy.run_module("papairus.settings", run_name="__main__")

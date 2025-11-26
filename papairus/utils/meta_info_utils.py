@@ -4,8 +4,8 @@ import os
 import git
 from colorama import Fore, Style
 
-from repo_agent.log import logger
-from repo_agent.settings import SettingsManager
+from papairus.log import logger
+from papairus.settings import SettingsManager
 
 latest_verison_substring = "_latest_version.py"
 

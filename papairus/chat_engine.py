@@ -1,9 +1,9 @@
 from llama_index.llms.openai_like import OpenAILike
 
-from repo_agent.doc_meta_info import DocItem
-from repo_agent.log import logger
-from repo_agent.prompt import chat_template
-from repo_agent.settings import SettingsManager
+from papairus.doc_meta_info import DocItem
+from papairus.log import logger
+from papairus.prompt import chat_template
+from papairus.settings import SettingsManager
 
 
 class ChatEngine:

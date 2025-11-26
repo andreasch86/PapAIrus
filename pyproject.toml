@@ -33,8 +33,8 @@ dependencies = [
 repository = "https://github.com/OpenBMB/RepoAgent"
 
 [project.scripts]
-papairus = "repo_agent.main:cli"
-papairusrun = "repo_agent.main:cli"
+papairus = "papairus.main:cli"
+papairusrun = "papairus.main:cli"
 install-hooks = "pre_commit.commands.install:install"
 
 [project.optional-dependencies]
@@ -50,13 +50,13 @@ requires = ["hatchling>=1.25.0"]
 build-backend = "hatchling.build"
 
 [tool.hatch.build.targets.wheel]
-packages = ["repo_agent"]
+packages = ["papairus"]
 
 [tool.hatch.build.targets.editable]
-packages = ["repo_agent"]
+packages = ["papairus"]
 
 [tool.hatch.build.targets.sdist]
-include = ["repo_agent", "README.md", "pyproject.toml", "pylint.rc", "pytest.ini", "assets", "display", "markdown_docs", "tests"]
+include = ["papairus", "README.md", "pyproject.toml", "pylint.rc", "pytest.ini", "assets", "display", "markdown_docs", "tests"]
 
 [tool.uv]
 dev-dependencies = [
@@ -73,24 +73,24 @@ dev-dependencies = [
 
 [tool.pytest.ini_options]
 minversion = "6.0"
-pythonpath = ["repo_agent"]
+pythonpath = ["papairus"]
 testpaths = ["tests"]
-addopts = "--cov=repo_agent"
+addopts = "--cov=papairus"
 
 [tool.coverage.run]
 branch = true
-source = ["repo_agent"]
+source = ["papairus"]
 omit = [
-    "repo_agent/chat_with_repo/*",
-    "repo_agent/change_detector.py",
-    "repo_agent/chat_engine.py",
-    "repo_agent/doc_meta_info.py",
-    "repo_agent/file_handler.py",
-    "repo_agent/log.py",
-    "repo_agent/multi_task_dispatch.py",
-    "repo_agent/project_manager.py",
-    "repo_agent/runner.py",
-    "repo_agent/utils/meta_info_utils.py",
+    "papairus/chat_with_repo/*",
+    "papairus/change_detector.py",
+    "papairus/chat_engine.py",
+    "papairus/doc_meta_info.py",
+    "papairus/file_handler.py",
+    "papairus/log.py",
+    "papairus/multi_task_dispatch.py",
+    "papairus/project_manager.py",
+    "papairus/runner.py",
+    "papairus/utils/meta_info_utils.py",
 ]
 
 [tool.coverage.report]

@@ -1,4 +1,4 @@
-# repo_agent/log.py
+# papairus/log.py
 import inspect
 import logging
 import sys

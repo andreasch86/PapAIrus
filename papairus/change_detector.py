@@ -4,8 +4,8 @@ import subprocess
 import git
 from colorama import Fore, Style
 
-from repo_agent.file_handler import FileHandler
-from repo_agent.settings import SettingsManager
+from papairus.file_handler import FileHandler
+from papairus.settings import SettingsManager
 
 
 class ChangeDetector:

@@ -7,8 +7,8 @@ import click
 import pytest
 from click.testing import CliRunner
 
-from repo_agent import main
-from repo_agent.settings import (
+from papairus import main
+from papairus.settings import (
     SettingsManager,
     Setting,
     ProjectSettings,
@@ -385,7 +385,7 @@ def test_diff_reports_no_tasks(monkeypatch):
 def test_chat_with_repo_invokes_module(monkeypatch):
     invoked = {}
     fake_chat_module = types.SimpleNamespace(main=lambda: invoked.setdefault("chat", True))
-    monkeypatch.setitem(sys.modules, "repo_agent.chat_with_repo", fake_chat_module)
+    monkeypatch.setitem(sys.modules, "papairus.chat_with_repo", fake_chat_module)
     monkeypatch.setattr(SettingsManager, "get_setting", lambda: stub_settings(Path(".")))
 
     runner = CliRunner()
@@ -438,7 +438,7 @@ def test_module_entrypoint_executes(monkeypatch):
         calls["cli"] = True
 
     monkeypatch.setattr(main, "cli", fake_cli)
-    runpy.run_module("repo_agent.__main__", run_name="__main__")
+    runpy.run_module("papairus.__main__", run_name="__main__")
     assert calls["cli"] is True
 
 
@@ -450,7 +450,7 @@ def test_module_entrypoint_import_does_not_trigger_cli():
     def fake_cli():
         calls["cli"] = True
 
-    import repo_agent.__main__ as module
+    import papairus.__main__ as module
 
     module.cli = fake_cli
     importlib.reload(module)

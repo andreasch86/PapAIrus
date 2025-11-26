@@ -6,7 +6,7 @@ from llama_index.core.retrievers import VectorIndexRetriever
 from llama_index.embeddings.openai import OpenAIEmbedding
 from llama_index.vector_stores.chroma import ChromaVectorStore
 
-from repo_agent.log import logger
+from papairus.log import logger
 
 
 class VectorStoreManager:

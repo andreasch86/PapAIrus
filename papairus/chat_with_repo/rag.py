@@ -2,16 +2,16 @@ import json
 
 from llama_index.llms.openai import OpenAI
 
-from repo_agent.chat_with_repo.json_handler import JsonFileProcessor
-from repo_agent.chat_with_repo.prompt import (
+from papairus.chat_with_repo.json_handler import JsonFileProcessor
+from papairus.chat_with_repo.prompt import (
     query_generation_template,
     rag_ar_template,
     rag_template,
     relevance_ranking_chat_template,
 )
-from repo_agent.chat_with_repo.text_analysis_tool import TextAnalysisTool
-from repo_agent.chat_with_repo.vector_store_manager import VectorStoreManager
-from repo_agent.log import logger
+from papairus.chat_with_repo.text_analysis_tool import TextAnalysisTool
+from papairus.chat_with_repo.vector_store_manager import VectorStoreManager
+from papairus.log import logger
 
 
 class RepoAssistant:

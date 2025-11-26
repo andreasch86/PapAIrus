@@ -1,7 +1,7 @@
 from llama_index.core.llms.function_calling import FunctionCallingLLM
 from llama_index.llms.openai import OpenAI
 
-from repo_agent.chat_with_repo.json_handler import JsonFileProcessor
+from papairus.chat_with_repo.json_handler import JsonFileProcessor
 
 
 class TextAnalysisTool:

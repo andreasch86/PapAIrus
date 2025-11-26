@@ -6,7 +6,7 @@ PapAIrus is a corporate adaptation of the upstream [OpenBMB/RepoAgent](https://g
 - Automatic repository analysis and documentation generation across Python, Go, Rust, C++, Java, and SQL projects.
 - Safety rails: refuses to run when no code changes are present, warns before operating on `main`/`master`, and provides a `--dry-run` preview.
 - Telemetry is opt-in only; no background tracking unless explicitly requested.
-- Config discovery prioritises `pyproject.toml` `[tool.corp_repoagent]` in the target repository, with CLI flags as a fallback.
+- Config discovery prioritises `pyproject.toml` `[tool.corp_papairus]` in the target repository, with CLI flags as a fallback.
 - GitLab integration (planned): generate docs, push to a branch, and open an MR with reviewers notified.
 
 ## Installation

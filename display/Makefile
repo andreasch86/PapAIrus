@@ -21,7 +21,7 @@ RESET  := $(shell tput -Txterm sgr0)
 .PHONY: help
 .PHONY: init_env env_install
 .PHONY: init npm_install clear_book copy_book_json install
-.PHONY: generate generate_repo_agent_books generate_summary
+.PHONY: generate generate_papairus_books generate_summary
 
 
 ################################################################################
@@ -69,17 +69,17 @@ init: npm_install clear_book copy_book_json install
 clear_src:
 	-rm -rf ./books/$(BOOK_NAME)/src
 
-generate_repo_agent_books:
-	@echo "Generating Repo Agent books..."
-	@python ./book_tools/generate_repoagent_books.py $(MARKDOWN_DOCS_FOLDER) $(BOOK_NAME) $(REPO_PATH)
+generate_papairus_books:
+        @echo "Generating PapAIrus books..."
+        @python ./book_tools/generate_papairus_books.py $(MARKDOWN_DOCS_FOLDER) $(BOOK_NAME) $(REPO_PATH)
 
 generate_summary:
 	@echo "Generating summary..."
 	@python ./book_tools/generate_summary_from_book.py $(BOOK_NAME)
 
 ## generate repo book
-generate: clear_src generate_repo_agent_books generate_summary
-	@echo complete repo book: $(BOOK_NAME) generate
+generate: clear_src generate_papairus_books generate_summary
+        @echo complete repo book: $(BOOK_NAME) generate
 
 ## serve gitbook
 serve:  generate

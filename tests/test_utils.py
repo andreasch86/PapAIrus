@@ -1,7 +1,7 @@
 from pathlib import Path
 
-from repo_agent.utils.gitignore_checker import GitignoreChecker
-from repo_agent.change_detector import ChangeDetector
+from papairus.utils.gitignore_checker import GitignoreChecker
+from papairus.change_detector import ChangeDetector
 
 
 def test_gitignore_checker(tmp_path):

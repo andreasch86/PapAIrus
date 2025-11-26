@@ -1,5 +1,5 @@
 # FileHandler English，English，EnglishmarkdownEnglishpythonEnglish
-# repo_agent/file_handler.py
+# papairus/file_handler.py
 import ast
 import json
 import os
@@ -8,10 +8,10 @@ import git
 from colorama import Fore, Style
 from tqdm import tqdm
 
-from repo_agent.log import logger
-from repo_agent.settings import SettingsManager
-from repo_agent.utils.gitignore_checker import GitignoreChecker
-from repo_agent.utils.meta_info_utils import latest_verison_substring
+from papairus.log import logger
+from papairus.settings import SettingsManager
+from papairus.utils.gitignore_checker import GitignoreChecker
+from papairus.utils.meta_info_utils import latest_verison_substring
 
 
 class FileHandler:
