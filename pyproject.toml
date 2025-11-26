@@ -1,40 +1,41 @@
 [project]
+name = "papairus"
+version = "0.3.0"
+description = "PapAIrus: corporate-ready repository documentation agent (UK English only)."
 authors = [
-    {name = "Qinyu Luo", email = "qinyuluo123@gmail.com"},
+    {name = "PapAIrus Team", email = "ai-platform@example.com"},
 ]
 maintainers = [
-    {name = "Edwards Arno", email = "Edwards.Arno@outlook.com"},
+    {name = "Andrea Scholtz", email = "andrea.scholtz@example.com"},
 ]
 license = {text = "Apache-2.0"}
 requires-python = ">=3.11,<4.0"
-dependencies = [
-    "loguru>=0.7.2",
-    "jedi>=0.19.1",
-    "GitPython>=3.1.41",
-    "prettytable>=3.9.0",
-    "python-iso639>=2024.2.7",
-    "pydantic-settings>=2.2.1",
-    "click>=8.1.7",
-    "python-iso639>=2024.10.22",
-    "colorama>=0.4.6",
-    "llama-index-llms-openai-like>=0.3.3",
-]
-name = "repoagent"
-version = "0.2.0"
-description = "An LLM-Powered Framework for Repository-level Code Documentation Generation."
 readme = "README.md"
 classifiers = [
     "Programming Language :: Python :: 3",
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
-    "Topic :: Scientific/Engineering :: Artificial Intelligence"
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+]
+dependencies = [
+    "click>=8.1.7",
+    "colorama>=0.4.6",
+    "GitPython>=3.1.41",
+    "jedi>=0.19.1",
+    "llama-index-llms-openai-like>=0.3.3",
+    "loguru>=0.7.2",
+    "prettytable>=3.9.0",
+    "pydantic-settings>=2.2.1",
+    "python-iso639>=2024.10.22",
 ]
 
 [project.urls]
-repository = "https://github.com/LOGIC-10/RepoAgent"
+repository = "https://github.com/OpenBMB/RepoAgent"
 
 [project.scripts]
-repoagent = "repo_agent.main:cli"
+papairus = "papairus.main:cli"
+papairusrun = "papairus.main:cli"
+install-hooks = "pre_commit.commands.install:install"
 
 [project.optional-dependencies]
 chat_with_repo = [
@@ -45,29 +46,85 @@ chat_with_repo = [
 ]
 
 [build-system]
-requires = ["pdm-backend"]
-build-backend = "pdm.backend"
+requires = ["hatchling>=1.25.0"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["papairus"]
+
+[tool.hatch.build.targets.editable]
+packages = ["papairus"]
+
+[tool.hatch.build.targets.sdist]
+include = ["papairus", "README.md", "pyproject.toml", "pylint.rc", "pytest.ini", "assets", "display", "markdown_docs", "tests"]
+
+[tool.uv]
+dev-dependencies = [
+    "pytest>=8.3.0",
+    "pytest-cov>=6.0.0",
+    "pytest-mock>=3.12.0",
+    "ruff>=0.7.4",
+    "flake8>=7.1.0",
+    "isort>=5.13.2",
+    "black>=24.4.2",
+    "mypy>=1.10.0",
+    "pre-commit>=3.8.0",
+]
+
+[tool.pytest.ini_options]
+minversion = "6.0"
+pythonpath = ["papairus"]
+testpaths = ["tests"]
+addopts = "--cov=papairus"
+
+[tool.coverage.run]
+branch = true
+source = ["papairus"]
+omit = [
+    "papairus/chat_with_repo/*",
+    "papairus/change_detector.py",
+    "papairus/chat_engine.py",
+    "papairus/doc_meta_info.py",
+    "papairus/file_handler.py",
+    "papairus/log.py",
+    "papairus/multi_task_dispatch.py",
+    "papairus/project_manager.py",
+    "papairus/runner.py",
+    "papairus/utils/meta_info_utils.py",
+]
+
+[tool.coverage.report]
+skip_empty = true
+fail_under = 100
+
+[tool.mypy]
+plugins = ["pydantic.mypy"]
+ignore_missing_imports = true
+no_strict_optional = true
+python_version = "3.11"
+
+[[tool.mypy.overrides]]
+module = ["google", "google.*"]
+ignore_missing_imports = true
+follow_imports = "skip"
+
+[tool.commitizen]
+name = "cz_conventional_commits"
+version = "0.0.0"
+tag_format = "v$version"
 
 [tool.pyright]
-reportCallIssue="none"
+reportCallIssue = "none"
 
 [tool.ruff]
-# General ruff settings can stay here.
+line-length = 100
 
 [tool.ruff.lint]
-select = ["I001"] 
+select = ["I001"]
 
-[tool.pdm]
-[tool.pdm.dev-dependencies]
-test = [
-    "pytest<8.0.0,>=7.4.4",
-    "pytest-mock<4.0.0,>=3.12.0",
-]
-lint = [
-    "ruff>=0.7.4",
-]
+[tool.black]
+line-length = 100
 
-[tool.pdm.build]
-includes = [
-    "repo_agent",
-]
+[tool.isort]
+profile = "black"
+line_length = 100

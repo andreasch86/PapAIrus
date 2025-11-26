@@ -1,0 +1,65 @@
+files: ^repo_agent/
+
+repos:
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v4.6.0
+    hooks:
+      - id: trailing-whitespace
+        exclude: '\\.(md|toml)$'
+      - id: end-of-file-fixer
+        exclude: '\\.(md|toml)$'
+      - id: detect-aws-credentials
+        args: [--allow-missing-credentials]
+      - id: detect-private-key
+
+  - repo: https://github.com/pycqa/flake8
+    rev: 7.1.0
+    hooks:
+      - id: flake8
+        args: [ --config, repo_agent/setup.cfg ]
+
+  - repo: https://github.com/PyCQA/isort
+    rev: 5.13.2
+    hooks:
+      - id: isort
+
+  - repo: https://github.com/psf/black
+    rev: 24.4.2
+    hooks:
+      - id: black
+
+  - repo: https://github.com/pre-commit/mirrors-mypy
+    rev: v1.10.0
+    hooks:
+      - id: mypy
+        pass_filenames: false
+        args:
+          - --cache-fine-grained
+          - --no-namespace-packages
+          - --ignore-missing-imports
+          - --allow-untyped-defs
+          - --exclude
+          - repo_agent/(chat_with_repo/.*|doc_meta_info\.py)
+          - repo_agent/
+        additional_dependencies:
+          - pydantic[mypy]==2.6.1
+          - pydantic-extra-types==2.10.5
+          - tokenize-rt==3.2.0
+          - types-PyYAML
+          - types-requests
+          - types-Jinja2
+          - pytest==7.4.4
+          - google-api-python-client-stubs==1.28.0
+
+  - repo: https://github.com/rubik/xenon
+    rev: v0.9.1
+    hooks:
+      - id: xenon
+        args: [-b, D, -m, D, -a, D, -e, test*]
+
+  - repo: https://github.com/commitizen-tools/commitizen
+    rev: v3.28.0
+    hooks:
+      - id: commitizen
+        stages: [ commit-msg ]
+        always_run: true

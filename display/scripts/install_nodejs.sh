@@ -5,7 +5,7 @@ export NVM_DIR="$HOME/.nvm"
 [ -s "$NVM_DIR/bash_completion" ] && \. "$NVM_DIR/bash_completion"  # This loads nvm bash_completion
 
 
-# 检查是否已经安装了 nvm
+# Check whether nvm is already installed
 check_nvm_installed() {
     if [ -s "$NVM_DIR/nvm.sh" ]; then
         echo "nvm is already installed"
@@ -16,17 +16,19 @@ check_nvm_installed() {
     fi
 }
 
-# 安装 nvm
+# Install nvm on Linux
 install_nvm_linux() {
     curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.1/install.sh | bash
     source "$NVM_DIR/nvm.sh"
 }
 
+# Install nvm on macOS
 install_nvm_mac() {
     curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.1/install.sh | bash
     source "$NVM_DIR/nvm.sh"
 }
 
+# Install nvm on Windows
 install_nvm_windows() {
     echo "Downloading nvm for Windows..."
     curl -o nvm-setup.exe -L https://github.com/coreybutler/nvm/releases/download/1.1.12/nvm-setup.exe
@@ -38,13 +40,13 @@ install_nvm_windows() {
     rm -f nvm-setup.exe
 }
 
-# 安装 Node.js 10
+# Install Node.js 10
 install_nodejs() {
     nvm install 10
     nvm use 10
 }
 
-# 检查 Node.js 是否安装成功
+# Verify Node.js installation
 check_node() {
     node_version=$(node -v)
     echo "Installed Node.js version: $node_version"
@@ -56,7 +58,7 @@ check_node() {
     fi
 }
 
-# 检测操作系统并安装 nvm（如果需要）
+# Detect the operating system and install nvm if needed
 case "$OSTYPE" in
   linux-gnu*)
     if ! check_nvm_installed; then
@@ -79,7 +81,7 @@ case "$OSTYPE" in
     ;;
 esac
 
-# 安装 Node.js 10
+# Install Node.js 10
 install_nodejs
 
 check_node

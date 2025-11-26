@@ -1,61 +1,40 @@
-## 前提条件
+## Prerequisites
 
-在使用 RepoAgent 对相应 repo 生成文档之后，请进入 display 文件夹。
-  
+After generating documentation for a repository with PapAIrus, change into the `display` folder:
+
 ```bash
 cd display
 ```
 
-您需要 **nodejs 10** 的环境，可以使用 nvm 来安装。
+You need **Node.js 10**. The provided script uses nvm to install it.
 
-## 一键部署命令脚本
+## One-command deployment scripts
 
-您可以在命令行输入`make help`，查看我们的自动部署脚本。
+Run `make help` to view the available automation targets:
 
 ```bash
-(RepoAgent) yesai@yesaideMacBook-Pro:RepoAgent/display ‹wys*›$ make help
-BOOK_NAME is XAgent-Dev
-MARKDOWN_DOCS_FOLDER is Markdown_Docs
-
-Usage:
-  make <task>
-
-Tasks:
-  init_env                       init nodejs 10.x env
-  clear_book                     clear repo generated book
-  init                           gitbook init to install plugins
-  generate                       generate repo book
-  serve                          serve gitbook
-  help                           make help info
-
+make help
 ```
 
-其中，您可以直接使用`make init_env`进行nvm和nodejs 10 的安装，也可以自己根据自身系统，自行安装 nodejs 10。
-如果是Windows系统，您可以使用管理员权限打开命令行，然后输入命令。
+Use `make init_env` to install nvm and Node.js 10 automatically, or install Node.js 10 manually if you prefer. On Windows, run the command prompt as an administrator.
 
-然后您可以依次进行 `make init` 初始化 gitbook 运行环境（make init 运行一次即可）。
+Then run `make init` once to initialise the GitBook environment. After the environment is ready, you can re-run `make serve` whenever you change configuration or `book.json` to redeploy the book.
 
-环境准备妥当后，您可以多次执行 `make serve`，更改相关配置或者`book.json`后，只需重新运行`make serve` 即可重新部署。
+A successful run looks like:
 
-成功后命令行输出如下所示：
-
-```bash
+```
 init!
 finish!
-info: >> generation finished with success in 16.7s ! 
+info: >> generation finished with success in 16.7s !
 
 Starting server ...
 Serving book on http://localhost:4000
 ```
 
-之后您可以在 http://localhost:4000/ 看到您的可视化 gitbook repo 文档。
+Open http://localhost:4000/ to view your rendered GitBook documentation.
 
+## Future TODO List
 
-## Future TODO List：
-
-[✅] 一键自动创建环境
-
-[ ] （本地创建环境不好弄的话）docker 一键部署 gitbook 以及上传
-
-[ ] 自动一键部署到对应 github 或 gitee 的 Repo 的对应 pages，让大家通过repo相关网址可以直接访问文档
-
+- [✅] One-click environment creation
+- [ ] (If local setup is difficult) Docker-based one-click GitBook deployment and upload
+- [ ] One-click deployment to the relevant GitHub or Gitee Pages site for direct access via the repository URL
