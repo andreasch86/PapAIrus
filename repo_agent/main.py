@@ -1,6 +1,7 @@
 from importlib import metadata
 
 import click
+import git
 from pydantic import ValidationError
 
 from repo_agent.doc_meta_info import DocItem, MetaInfo
@@ -10,7 +11,7 @@ from repo_agent.settings import SettingsManager, LogLevel
 from repo_agent.utils.meta_info_utils import delete_fake_files, make_fake_files
 
 try:
-    version_number = metadata.version("repoagent")
+    version_number = metadata.version("papairus")
 except metadata.PackageNotFoundError:
     version_number = "0.0.0"
 
@@ -24,7 +25,6 @@ def cli():
 
 def handle_setting_error(e: ValidationError):
     """Handle configuration errors for settings."""
-    # 输出更详细的字段缺失信息，使用颜色区分
     for error in e.errors():
         field = error["loc"][-1]
         if error["type"] == "missing":
@@ -36,7 +36,6 @@ def handle_setting_error(e: ValidationError):
             message = click.style(error["msg"], fg="yellow")
         click.echo(message, err=True, color=True)
 
-    # 使用 ClickException 优雅地退出程序
     raise click.ClickException(
         click.style(
             "Program terminated due to configuration errors.", fg="red", bold=True
@@ -48,9 +47,9 @@ def handle_setting_error(e: ValidationError):
 @click.option(
     "--model",
     "-m",
-    default="gpt-4o-mini",
+    default="gemini-3.5-flash",
     show_default=True,
-    help="Specifies the model to use for completion.",
+    help="Specifies the model to use for completion (gemma-local or gemini-3.5-flash).",
     type=str,
 )
 @click.option(
@@ -72,7 +71,7 @@ def handle_setting_error(e: ValidationError):
 @click.option(
     "--base-url",
     "-b",
-    default="https://api.openai.com/v1",
+    default="https://generativelanguage.googleapis.com/v1beta",
     show_default=True,
     help="The base URL for the API calls.",
     type=str,
@@ -110,9 +109,9 @@ def handle_setting_error(e: ValidationError):
 @click.option(
     "--language",
     "-l",
-    default="English",
+    default="English (UK)",
     show_default=True,
-    help="The ISO 639 code or language name for the documentation. ",
+    help="PapAIrus only supports UK English output.",
     type=str,
 )
 @click.option(
@@ -137,6 +136,23 @@ def handle_setting_error(e: ValidationError):
     default=False,
     help="If set, prints the hierarchy of the target repository when finished running the main task.",
 )
+@click.option(
+    "--dry-run",
+    is_flag=True,
+    default=False,
+    help="Preview actions and git diff without writing documentation.",
+)
+@click.option(
+    "--allow-main",
+    is_flag=True,
+    default=False,
+    help="Acknowledge running on the main branch (otherwise a warning is emitted).",
+)
+@click.option(
+    "--telemetry/--no-telemetry",
+    default=False,
+    help="Explicitly opt in to telemetry (off by default).",
+)
 def run(
     model,
     temperature,
@@ -150,8 +166,42 @@ def run(
     max_thread_count,
     log_level,
     print_hierarchy,
+    dry_run,
+    allow_main,
+    telemetry,
 ):
     """Run the program with the specified parameters."""
+    repo = None
+    try:
+        repo = git.Repo(target_repo_path or ".")
+    except git.InvalidGitRepositoryError:
+        click.echo(
+            click.style(
+                "Target path is not a git repository; continuing without VCS safeguards.",
+                fg="yellow",
+            )
+        )
+
+    if repo:
+        try:
+            branch_name = repo.active_branch.name
+            if branch_name in {"main", "master"} and not allow_main:
+                click.echo(
+                    click.style(
+                        "Warning: running PapAIrus on the main branch. Re-run with --allow-main to proceed.",
+                        fg="yellow",
+                    ),
+                    err=True,
+                )
+                return
+        except TypeError:
+            pass
+
+        if not repo.is_dirty(untracked_files=True):
+            raise click.ClickException(
+                "No code changes detected on this branch; PapAIrus will not run."
+            )
+
     try:
         # Fetch and validate the settings using the SettingsManager
         setting = SettingsManager.initialize_with_params(
@@ -165,6 +215,7 @@ def run(
             temperature=temperature,
             request_timeout=request_timeout,
             openai_base_url=base_url,
+            telemetry_opt_in=telemetry,
             max_thread_count=max_thread_count,
         )
         set_logger_level_from_config(log_level=log_level)
@@ -172,7 +223,14 @@ def run(
         handle_setting_error(e)
         return
 
-    # 如果设置成功，则运行任务
+    if dry_run:
+        click.echo("Dry-run: showing git diff and exiting without writes.")
+        if repo:
+            click.echo(repo.git.diff())
+        else:
+            click.echo("No git repository detected; nothing to diff.")
+        return
+
     runner = Runner()
     runner.run()
     logger.success("Documentation task completed.")
@@ -239,5 +297,5 @@ def chat_with_repo():
     main()
 
 
-if __name__ == "__main__":
+if __name__ == "__main__":  # pragma: no cover
     cli()

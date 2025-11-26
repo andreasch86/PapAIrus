@@ -1,5 +1,6 @@
 import fnmatch
 import os
+import fnmatch
 
 
 class GitignoreChecker:

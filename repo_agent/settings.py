@@ -28,20 +28,26 @@ class ProjectSettings(BaseSettings):
     hierarchy_name: str = ".project_doc_record"
     markdown_docs_name: str = "markdown_docs"
     ignore_list: list[str] = []
-    language: str = "English"
+    language: str = "English (UK)"
     max_thread_count: PositiveInt = 4
     log_level: LogLevel = LogLevel.INFO
+    telemetry_opt_in: bool = False
 
     @field_validator("language")
     @classmethod
     def validate_language_code(cls, v: str) -> str:
+        normalized = v.strip().lower()
+        if "english" in normalized:
+            return "English (UK)"
         try:
             language_name = Language.match(v).name
-            return language_name  # Returning the resolved language name
         except LanguageNotFoundError:
             raise ValueError(
                 "Invalid language input. Please enter a valid ISO 639 code or language name."
             )
+        if language_name.lower() != "english":
+            raise ValueError("PapAIrus only supports UK English output.")
+        return "English (UK)"
 
     @field_validator("log_level", mode="before")
     @classmethod
@@ -56,16 +62,26 @@ class ProjectSettings(BaseSettings):
 
 
 class ChatCompletionSettings(BaseSettings):
-    model: str = "gpt-4o-mini"  # NOTE: No model restrictions for user flexibility, but it's recommended to use models with a larger context window.
+    model: str = "gemini-3.5-flash"  # Only Gemini (API) or local Gemma are allowed.
     temperature: PositiveFloat = 0.2
     request_timeout: PositiveInt = 60
-    openai_base_url: str = "https://api.openai.com/v1"
+    openai_base_url: str = "https://generativelanguage.googleapis.com/v1beta"
     openai_api_key: SecretStr = Field(..., exclude=True)
 
     @field_validator("openai_base_url", mode="before")
     @classmethod
     def convert_base_url_to_str(cls, openai_base_url: HttpUrl) -> str:
         return str(openai_base_url)
+
+    @field_validator("model")
+    @classmethod
+    def validate_model(cls, value: str) -> str:
+        allowed_models = {"gemini-3.5-flash", "gemma-local"}
+        if value not in allowed_models:
+            raise ValueError(
+                "Model must be one of: gemma-local (self-hosted) or gemini-3.5-flash (API)."
+            )
+        return value
 
 
 class Setting(BaseSettings):
@@ -98,6 +114,7 @@ class SettingsManager:
         temperature: float,
         request_timeout: int,
         openai_base_url: str,
+        telemetry_opt_in: bool,
     ):
         project_settings = ProjectSettings(
             target_repo=target_repo,
@@ -107,6 +124,7 @@ class SettingsManager:
             language=language,
             max_thread_count=max_thread_count,
             log_level=LogLevel(log_level),
+            telemetry_opt_in=telemetry_opt_in,
         )
 
         chat_completion_settings = ChatCompletionSettings(
