@@ -71,7 +71,7 @@ def handle_setting_error(e: ValidationError):
     "-b",
     default="https://generativelanguage.googleapis.com/v1beta",
     show_default=True,
-    help="The base URL for the API calls.",
+    help="The base URL for Gemini API calls.",
     type=str,
 )
 @click.option(
@@ -212,7 +212,7 @@ def run(
             model=model,
             temperature=temperature,
             request_timeout=request_timeout,
-            openai_base_url=base_url,
+            gemini_base_url=base_url,
             telemetry_opt_in=telemetry,
             max_thread_count=max_thread_count,
         )

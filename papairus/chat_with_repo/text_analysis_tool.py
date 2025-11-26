@@ -1,5 +1,4 @@
 from llama_index.core.llms.function_calling import FunctionCallingLLM
-from llama_index.llms.openai import OpenAI
 
 from papairus.chat_with_repo.json_handler import JsonFileProcessor
 
@@ -54,9 +53,10 @@ The output function name or class name should be only one.
 
 
 if __name__ == "__main__":
-    api_base = "https://api.openai.com/v1"
+    from llama_index.llms.gemini import Gemini
+
     api_key = "your_api_key"
     log_file = "your_logfile_path"
-    llm = OpenAI(api_key=api_key, api_base=api_base)
+    llm = Gemini(api_key=api_key, model="gemini-3.5-flash")
     db_path = "your_database_path"
     test = TextAnalysisTool(llm, db_path)
