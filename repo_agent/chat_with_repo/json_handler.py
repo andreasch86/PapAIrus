@@ -73,7 +73,7 @@ class JsonFileProcessor:
                 code_results = []
                 md_results = []  # List to store matching items' code_content and md_content
                 self.recursive_search(data, search_text, code_results, md_results)
-                # 确保无论结果如何都返回两个值
+                # English
                 if code_results or md_results:
                     return code_results, md_results
                 else:

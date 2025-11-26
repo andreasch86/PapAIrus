@@ -257,7 +257,7 @@ def diff():
         return
 
     runner = Runner()
-    if runner.meta_info.in_generation_process:  # 如果不是在生成过程中，就开始检测变更
+    if runner.meta_info.in_generation_process:  # English，English
         click.echo("This command only supports pre-check")
         raise click.Abort()
 

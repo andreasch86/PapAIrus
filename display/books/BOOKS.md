@@ -1,5 +1,5 @@
-支持多个 repo book 的创建。
+Support creating multiple repo books.
 
-统一 book template，支持完全自定义。
+Provide a unified, fully customisable book template.
 
-在 config.yml 中，配置生成的是repo doc，不用更改config.yml，直接运行 make 命令即可生成对应的repo book展示。
+If `config.yml` is configured for repository documentation, you can run the `make` commands directly without further changes to generate and display the repo book.

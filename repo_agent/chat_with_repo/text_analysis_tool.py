@@ -32,9 +32,9 @@ class TextAnalysisTool:
 
     def list_to_markdown(self, search_result):
         markdown_str = ""
-        # 遍历列表，将每个元素转换为Markdown格式的项
+        # English，EnglishMarkdownEnglish
         for index, content in enumerate(search_result, start=1):
-            # 添加到Markdown字符串中，每个项后跟一个换行符
+            # EnglishMarkdownEnglish，English
             markdown_str += f"{index}. {content}\n\n"
 
         return markdown_str
