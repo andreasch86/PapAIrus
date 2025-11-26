@@ -1,6 +1,6 @@
-# PapAIrus (papairus)
+# PapAIrus
 
-PapAIrus is a corporate adaptation of the upstream [OpenBMB/RepoAgent](https://github.com/OpenBMB/RepoAgent), maintained by the AI Platform team and tailored by Andrea Scholtz for internal documentation workflows. The project enforces UK English output, Google-style docstrings, and a constrained model set (local Gemma or Google Gemini 3.5, Flash when available) to keep behaviour predictable and reviewable.
+PapAIrus (`papairus`) is a corporate adaptation of the upstream [OpenBMB/RepoAgent](https://github.com/OpenBMB/RepoAgent), maintained by the AI Platform team and tailored by Andrea Scholtz for internal documentation workflows. The project enforces UK English output, Google-style docstrings, and a constrained model set (local Gemma or Google Gemini 3.5, Flash when available) to keep behaviour predictable and reviewable.
 
 ## Key capabilities
 - Automatic repository analysis and documentation generation across Python, Go, Rust, C++, Java, and SQL projects.
@@ -21,7 +21,7 @@ uv pip install -e .[chat_with_repo]
 ```
 
 ## Usage
-PapAIrus exposes the `papairus` command (alias: `papairusrun`).
+PapAIrus exposes the `papairus` command.
 
 ```bash
 export OPENAI_API_KEY=your_gemini_key
