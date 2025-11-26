@@ -34,9 +34,7 @@ class RepoAssistant:
         self.vector_store_manager = VectorStoreManager(top_k=5, llm=self.weak_model)
 
     def generate_queries(self, query_str: str, num_queries: int = 4):
-        fmt_prompt = query_generation_template.format(
-            num_queries=num_queries - 1, query=query_str
-        )
+        fmt_prompt = query_generation_template.format(num_queries=num_queries - 1, query=query_str)
         response = self.weak_model.complete(fmt_prompt)
         queries = response.text.split("\n")
         return queries
@@ -45,9 +43,7 @@ class RepoAssistant:
         response = self.weak_model.chat(
             response_format={"type": "json_object"},
             temperature=0,
-            messages=relevance_ranking_chat_template.format_messages(
-                query=query, docs=docs
-            ),
+            messages=relevance_ranking_chat_template.format_messages(query=query, docs=docs),
         )
         scores = json.loads(response.message.content)["documents"]  # type: ignore
         logger.debug(f"scores: {scores}")
@@ -56,9 +52,7 @@ class RepoAssistant:
         return top_5_contents
 
     def rag(self, query, retrieved_documents):
-        rag_prompt = rag_template.format(
-            query=query, information="\n\n".join(retrieved_documents)
-        )
+        rag_prompt = rag_template.format(query=query, information="\n\n".join(retrieved_documents))
         response = self.weak_model.complete(rag_prompt)
         return response.text
 
@@ -100,7 +94,6 @@ class RepoAssistant:
         logger.debug(f"Generated queries: {prompt_queries}")
 
         all_results = []
-        all_documents = []
 
         # Step 3: Query the VectorStoreManager for each query
         for query in prompt_queries:
@@ -114,9 +107,7 @@ class RepoAssistant:
         unique_documents = [result["text"] for result in unique_results]
         logger.debug(f"Unique documents: {unique_documents}")
 
-        unique_code = [
-            result.get("metadata", {}).get("code_content") for result in unique_results
-        ]
+        unique_code = [result.get("metadata", {}).get("code_content") for result in unique_results]
         logger.debug(f"Unique code content: {unique_code}")
 
         # Step 5: Rerank documents based on relevance
@@ -161,9 +152,7 @@ class RepoAssistant:
         retrieved_documents = self.rerank(message, retrieved_documents[:6])
         logger.debug(f"Final retrieved documents after rerank: {retrieved_documents}")
 
-        uni_code = self.rerank(
-            message, list(dict.fromkeys(uni_codex + unique_code))[:6]
-        )
+        uni_code = self.rerank(message, list(dict.fromkeys(uni_codex + unique_code))[:6])
         logger.debug(f"Final unique code after rerank: {uni_code}")
 
         unique_code_md = self.textanslys.list_to_markdown(unique_code)

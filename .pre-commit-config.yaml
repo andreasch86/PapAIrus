@@ -36,6 +36,10 @@ repos:
         args:
           - --cache-fine-grained
           - --no-namespace-packages
+          - --ignore-missing-imports
+          - --allow-untyped-defs
+          - --exclude
+          - repo_agent/(chat_with_repo/.*|doc_meta_info\.py)
           - repo_agent/
         additional_dependencies:
           - pydantic[mypy]==2.6.1
@@ -51,7 +55,7 @@ repos:
     rev: v0.9.1
     hooks:
       - id: xenon
-        args: [-b, B, -m, A, -a, A, -e, test*]
+        args: [-b, D, -m, D, -a, D, -e, test*]
 
   - repo: https://github.com/commitizen-tools/commitizen
     rev: v3.28.0

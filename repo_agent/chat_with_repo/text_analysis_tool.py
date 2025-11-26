@@ -25,9 +25,7 @@ class TextAnalysisTool:
         return prompt
 
     def queryblock(self, message):
-        search_result, md = self.jsonsearch.search_code_contents_by_name(
-            self.db_path, message
-        )
+        search_result, md = self.jsonsearch.search_code_contents_by_name(self.db_path, message)
         return search_result, md
 
     def list_to_markdown(self, search_result):

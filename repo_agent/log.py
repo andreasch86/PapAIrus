@@ -24,9 +24,7 @@ class InterceptHandler(logging.Handler):
             frame = frame.f_back
             depth += 1
 
-        logger.opt(depth=depth, exception=record.exc_info).log(
-            level, record.getMessage()
-        )
+        logger.opt(depth=depth, exception=record.exc_info).log(level, record.getMessage())
 
 
 def set_logger_level_from_config(log_level):
@@ -46,9 +44,7 @@ def set_logger_level_from_config(log_level):
       all logs consistently across the application.
     """
     logger.remove()
-    logger.add(
-        sys.stderr, level=log_level, enqueue=True, backtrace=False, diagnose=False
-    )
+    logger.add(sys.stderr, level=log_level, enqueue=True, backtrace=False, diagnose=False)
 
     # Intercept standard logging
     logging.basicConfig(handlers=[InterceptHandler()], level=0, force=True)

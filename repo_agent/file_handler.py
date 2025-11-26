@@ -25,9 +25,7 @@ class FileHandler:
 
         setting = SettingsManager.get_setting()
 
-        self.project_hierarchy = (
-            setting.project.target_repo / setting.project.hierarchy_name
-        )
+        self.project_hierarchy = setting.project.target_repo / setting.project.hierarchy_name
 
     def read_file(self):
         """
@@ -42,9 +40,7 @@ class FileHandler:
             content = file.read()
         return content
 
-    def get_obj_code_info(
-        self, code_type, code_name, start_line, end_line, params, file_path=None
-    ):
+    def get_obj_code_info(self, code_type, code_name, start_line, end_line, params, file_path=None):
         """
         Get the code information for a given object.
 
@@ -69,9 +65,7 @@ class FileHandler:
         code_info["params"] = params
 
         with open(
-            os.path.join(
-                self.repo_path, file_path if file_path != None else self.file_path
-            ),
+            os.path.join(self.repo_path, file_path if file_path != None else self.file_path),
             "r",
             encoding="utf-8",
         ) as code_file:
@@ -131,11 +125,11 @@ class FileHandler:
         if commits:
             commit = commits[0]
             try:
-                previous_version = (
-                    (commit.tree / self.file_path).data_stream.read().decode("utf-8")
-                )
+                previous_version = (commit.tree / self.file_path).data_stream.read().decode("utf-8")
             except KeyError:
-                previous_version = None  # The file may be newly added and not present in previous commits
+                previous_version = (
+                    None  # The file may be newly added and not present in previous commits
+                )
 
         return current_version, previous_version
 
@@ -204,10 +198,7 @@ class FileHandler:
                 #         now = now.parent
                 #     return None
                 # parent_name = get_recursive_parent_name(node)
-                parameters = (
-                    [arg.arg for arg in node.args.args] if "args" in dir(node) else []
-                )
-                all_names = [item[1] for item in functions_and_classes]
+                parameters = [arg.arg for arg in node.args.args] if "args" in dir(node) else []
                 # (parent_name == None or parent_name in all_names) and
                 functions_and_classes.append(
                     (type(node).__name__, node.name, start_line, end_line, parameters)
@@ -293,9 +284,7 @@ class FileHandler:
             #     print(f"{Fore.LIGHTYELLOW_EX}[Unstaged ChangeFile] load fake-file-content: {Style.RESET_ALL}{normal_file_names}")
 
             try:
-                repo_structure[normal_file_names] = self.generate_file_structure(
-                    not_ignored_files
-                )
+                repo_structure[normal_file_names] = self.generate_file_structure(not_ignored_files)
             except Exception as e:
                 logger.error(
                     f"Alert: An error occurred while generating file structure for {not_ignored_files}: {e}"
@@ -328,9 +317,7 @@ class FileHandler:
         file_dict = json_data.get(file_path)
 
         if file_dict is None:
-            raise ValueError(
-                f"No file object found for {self.file_path} in project_hierarchy.json"
-            )
+            raise ValueError(f"No file object found for {self.file_path} in project_hierarchy.json")
 
         markdown = ""
         parent_dict = {}
@@ -354,9 +341,7 @@ class FileHandler:
                 if obj["params"]:
                     params_str = f"({', '.join(obj['params'])})"
             markdown += f"{'#' * level} {obj['type']} {obj['name']}{params_str}:\n"
-            markdown += (
-                f"{obj['md_content'][-1] if len(obj['md_content']) >0 else ''}\n"
-            )
+            markdown += f"{obj['md_content'][-1] if len(obj['md_content']) >0 else ''}\n"
         markdown += "***\n"
 
         return markdown

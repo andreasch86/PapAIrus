@@ -27,13 +27,9 @@ def make_fake_files():
     jump_files = []  # Englishparse、English，English
     for file_name in untracked_files:
         if file_name.endswith(".py"):
-            print(
-                f"{Fore.LIGHTMAGENTA_EX}[SKIP untracked files]: {Style.RESET_ALL}{file_name}"
-            )
+            print(f"{Fore.LIGHTMAGENTA_EX}[SKIP untracked files]: {Style.RESET_ALL}{file_name}")
             jump_files.append(file_name)
-    for diff_file in unstaged_changes.iter_change_type(
-        "A"
-    ):  # English、EnglishaddEnglish，English
+    for diff_file in unstaged_changes.iter_change_type("A"):  # English、EnglishaddEnglish，English
         if diff_file.a_path.endswith(latest_verison_substring):
             logger.error(
                 "FAKE_FILE_IN_GIT_STATUS detected! suggest to use `delete_fake_files` and re-generate document"
@@ -71,9 +67,7 @@ def make_fake_files():
                     os.path.join(setting.project.target_repo, latest_file_path), "w"
                 ) as writer:
                     pass
-            with open(
-                os.path.join(setting.project.target_repo, now_file_path), "w"
-            ) as writer:
+            with open(os.path.join(setting.project.target_repo, now_file_path), "w") as writer:
                 writer.write(raw_file_content)
             file_path_reflections[now_file_path] = latest_file_path  # realEnglishfake
     return file_path_reflections, jump_files

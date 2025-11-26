@@ -1,4 +1,3 @@
-import os
 import re
 import subprocess
 
@@ -165,12 +164,8 @@ class ChangeDetector:
         to_be_staged_files = []
         # staged_filesEnglish，Englishgit add English.pyEnglish English
         staged_files = [item.a_path for item in self.repo.index.diff("HEAD")]
-        print(
-            f"{Fore.LIGHTYELLOW_EX}target_repo_path{Style.RESET_ALL}: {self.repo_path}"
-        )
-        print(
-            f"{Fore.LIGHTMAGENTA_EX}already_staged_files{Style.RESET_ALL}:{staged_files}"
-        )
+        print(f"{Fore.LIGHTYELLOW_EX}target_repo_path{Style.RESET_ALL}: {self.repo_path}")
+        print(f"{Fore.LIGHTMAGENTA_EX}already_staged_files{Style.RESET_ALL}:{staged_files}")
 
         setting = SettingsManager.get_setting()
 
@@ -188,30 +183,6 @@ class ChangeDetector:
             # Englishrepo_pathEnglishuntracked_fileEnglish
             if untracked_file.startswith(setting.project.markdown_docs_name):
                 to_be_staged_files.append(untracked_file)
-            continue
-            print(f"rel_untracked_file:{rel_untracked_file}")
-            # import pdb; pdb.set_trace()
-            # English：
-            if rel_untracked_file.endswith(".md"):
-                # Englishrel_untracked_fileEnglishCONFIG['Markdown_Docs_folder']English。English.pyEnglish
-                rel_untracked_file = os.path.relpath(
-                    rel_untracked_file, setting.project.markdown_docs_name
-                )
-                corresponding_py_file = os.path.splitext(rel_untracked_file)[0] + ".py"
-                print(
-                    f"corresponding_py_file in untracked_files:{corresponding_py_file}"
-                )
-                if corresponding_py_file in staged_files:
-                    # English，EnglishmdEnglishunstaged_filesEnglish
-                    to_be_staged_files.append(
-                        os.path.join(
-                            self.repo_path.lstrip("/"),
-                            setting.project.markdown_docs_name,
-                            rel_untracked_file,
-                        )
-                    )
-            elif rel_untracked_file == project_hierarchy:
-                to_be_staged_files.append(rel_untracked_file)
 
         # English
         unstaged_files = [diff.b_path for diff in diffs]
@@ -228,33 +199,7 @@ class ChangeDetector:
                 to_be_staged_files.append(unstaged_file)
             elif unstaged_file == project_hierarchy:  # project_hierarchyEnglishadd
                 to_be_staged_files.append(unstaged_file)
-            continue
-            abs_unstaged_file = os.path.join(self.repo_path, unstaged_file)
-            # English
-            rel_unstaged_file = os.path.relpath(abs_unstaged_file, self.repo_path)
-            print(f"rel_unstaged_file:{rel_unstaged_file}")
-            # EnglishmdEnglish
-            if unstaged_file.endswith(".md"):
-                # Englishrel_unstaged_fileEnglishCONFIG['Markdown_Docs_folder']English。English.pyEnglish
-                rel_unstaged_file = os.path.relpath(
-                    rel_unstaged_file, setting.project.markdown_docs_name
-                )
-                corresponding_py_file = os.path.splitext(rel_unstaged_file)[0] + ".py"
-                print(f"corresponding_py_file:{corresponding_py_file}")
-                if corresponding_py_file in staged_files:
-                    # English，EnglishmdEnglishunstaged_filesEnglish
-                    to_be_staged_files.append(
-                        os.path.join(
-                            self.repo_path.lstrip("/"),
-                            setting.project.markdown_docs_name,
-                            rel_unstaged_file,
-                        )
-                    )
-            elif unstaged_file == project_hierarchy:  # project_hierarchyEnglishadd
-                to_be_staged_files.append(unstaged_file)
-        print(
-            f"{Fore.LIGHTRED_EX}newly_staged_files{Style.RESET_ALL}: {to_be_staged_files}"
-        )
+        print(f"{Fore.LIGHTRED_EX}newly_staged_files{Style.RESET_ALL}: {to_be_staged_files}")
         return to_be_staged_files
 
     def add_unstaged_files(self):

@@ -15,9 +15,7 @@ def main():
     api_key = setting.chat_completion.openai_api_key.get_secret_value()
     api_base = str(setting.chat_completion.openai_base_url)
     db_path = (
-        setting.project.target_repo
-        / setting.project.hierarchy_name
-        / "project_hierarchy.json"
+        setting.project.target_repo / setting.project.hierarchy_name / "project_hierarchy.json"
     )
 
     # Initialize RepoAssistant
@@ -29,9 +27,7 @@ def main():
     # Create vector store and measure runtime
     logger.info("Starting vector store creation...")
     start_time = time.time()
-    assistant.vector_store_manager.create_vector_store(
-        md_contents, meta_data, api_key, api_base
-    )
+    assistant.vector_store_manager.create_vector_store(md_contents, meta_data, api_key, api_base)
     elapsed_time = time.time() - start_time
     logger.info(f"Vector store created successfully in {elapsed_time:.2f} seconds.")
 

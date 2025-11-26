@@ -49,6 +49,15 @@ chat_with_repo = [
 requires = ["hatchling>=1.25.0"]
 build-backend = "hatchling.build"
 
+[tool.hatch.build.targets.wheel]
+packages = ["repo_agent"]
+
+[tool.hatch.build.targets.editable]
+packages = ["repo_agent"]
+
+[tool.hatch.build.targets.sdist]
+include = ["repo_agent", "README.md", "pyproject.toml", "pylint.rc", "pytest.ini", "assets", "display", "markdown_docs", "tests"]
+
 [tool.uv]
 dev-dependencies = [
     "pytest>=8.3.0",

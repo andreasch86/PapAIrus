@@ -1,14 +1,6 @@
 import chromadb
-from llama_index.core import (
-    Document,
-    StorageContext,
-    VectorStoreIndex,
-    get_response_synthesizer,
-)
-from llama_index.core.node_parser import (
-    SemanticSplitterNodeParser,
-    SentenceSplitter,
-)
+from llama_index.core import Document, StorageContext, VectorStoreIndex, get_response_synthesizer
+from llama_index.core.node_parser import SemanticSplitterNodeParser, SentenceSplitter
 from llama_index.core.query_engine import RetrieverQueryEngine
 from llama_index.core.retrievers import VectorIndexRetriever
 from llama_index.embeddings.openai import OpenAIEmbedding
@@ -63,15 +55,12 @@ class VectorStoreManager:
         base_splitter = SentenceSplitter(chunk_size=1024)
 
         documents = [
-            Document(text=content, extra_info=meta)
-            for content, meta in zip(md_contents, meta_data)
+            Document(text=content, extra_info=meta) for content, meta in zip(md_contents, meta_data)
         ]
 
         all_nodes = []
         for i, doc in enumerate(documents):
-            logger.debug(
-                f"Processing document {i+1}: Content length={len(doc.get_text())}"
-            )
+            logger.debug(f"Processing document {i+1}: Content length={len(doc.get_text())}")
 
             try:
                 # Try semantic splitting first
@@ -119,9 +108,7 @@ class VectorStoreManager:
         Query the vector store for relevant documents.
         """
         if not self.query_engine:
-            logger.error(
-                "Query engine is not initialized. Please create a vector store first."
-            )
+            logger.error("Query engine is not initialized. Please create a vector store first.")
             return []
 
         # Query the vector store

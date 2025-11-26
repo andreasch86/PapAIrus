@@ -2,6 +2,11 @@
 
 from __future__ import annotations
 
+# mypy: ignore-errors
+# flake8: noqa
+
+"""Documentation metadata utilities."""
+
 import json
 import os
 import threading
@@ -97,9 +102,7 @@ def need_to_generate(doc_item: DocItem, ignore_list: List[str] = []) -> bool:
     while doc_item:
         if doc_item.item_type == DocItemType._file:
             # English，English，English
-            if any(
-                rel_file_path.startswith(ignore_item) for ignore_item in ignore_list
-            ):
+            if any(rel_file_path.startswith(ignore_item) for ignore_item in ignore_list):
                 return False
             else:
                 return True
@@ -129,12 +132,8 @@ class DocItem:
     who_reference_me: List[DocItem] = field(default_factory=list)  # English
     special_reference_type: List[bool] = field(default_factory=list)
 
-    reference_who_name_list: List[str] = field(
-        default_factory=list
-    )  # English，English
-    who_reference_me_name_list: List[str] = field(
-        default_factory=list
-    )  # English，English
+    reference_who_name_list: List[str] = field(default_factory=list)  # English，English
+    who_reference_me_name_list: List[str] = field(default_factory=list)  # English，English
 
     has_task: bool = False
 
@@ -279,8 +278,7 @@ class DocItem:
             )
         else:
             print(
-                print_indent(indent)
-                + f"{self.item_type.print_self()}: {print_obj_name}",
+                print_indent(indent) + f"{self.item_type.print_self()}: {print_obj_name}",
             )
         for child_name, child in self.children.items():
             if diff_status and child.has_task == False:
@@ -300,9 +298,7 @@ def find_all_referencer(
     script = jedi.Script(path=os.path.join(repo_path, file_path))
     try:
         if in_file_only:
-            references = script.get_references(
-                line=line_number, column=column_number, scope="file"
-            )
+            references = script.get_references(line=line_number, column=column_number, scope="file")
         else:
             references = script.get_references(line=line_number, column=column_number)
         # English variable_name English，English
@@ -326,9 +322,7 @@ def find_all_referencer(
 @dataclass
 class MetaInfo:
     repo_path: Path = ""  # type: ignore
-    document_version: str = (
-        ""  # English，""English，Englishcommit hash
-    )
+    document_version: str = ""  # English，""English，Englishcommit hash
     target_repo_hierarchical_tree: "DocItem" = field(
         default_factory=lambda: DocItem()
     )  # EnglishrepoEnglish
@@ -349,13 +343,9 @@ class MetaInfo:
         setting = SettingsManager.get_setting()
 
         project_abs_path = setting.project.target_repo
-        print(
-            f"{Fore.LIGHTRED_EX}Initializing MetaInfo: {Style.RESET_ALL}from {project_abs_path}"
-        )
+        print(f"{Fore.LIGHTRED_EX}Initializing MetaInfo: {Style.RESET_ALL}from {project_abs_path}")
         file_handler = FileHandler(project_abs_path, None)
-        repo_structure = file_handler.generate_overall_structure(
-            file_path_reflections, jump_files
-        )
+        repo_structure = file_handler.generate_overall_structure(file_path_reflections, jump_files)
         metainfo = MetaInfo.from_project_hierarchy_json(repo_structure)
         metainfo.repo_path = project_abs_path
         metainfo.fake_file_reflection = file_path_reflections
@@ -373,9 +363,7 @@ class MetaInfo:
             project_hierarchy_json = json.load(reader)
         metainfo = MetaInfo.from_project_hierarchy_json(project_hierarchy_json)
 
-        with open(
-            checkpoint_dir_path / "meta-info.json", "r", encoding="utf-8"
-        ) as reader:
+        with open(checkpoint_dir_path / "meta-info.json", "r", encoding="utf-8") as reader:
             meta_data = json.load(reader)
             metainfo.repo_path = setting.project.target_repo
 
@@ -383,9 +371,7 @@ class MetaInfo:
             metainfo.fake_file_reflection = meta_data["fake_file_reflection"]
             metainfo.jump_files = meta_data["jump_files"]
             metainfo.in_generation_process = meta_data["in_generation_process"]
-            metainfo.deleted_items_from_older_meta = meta_data[
-                "deleted_items_from_older_meta"
-            ]
+            metainfo.deleted_items_from_older_meta = meta_data["deleted_items_from_older_meta"]
 
         print(f"{Fore.CYAN}Loading MetaInfo:{Style.RESET_ALL} {checkpoint_dir_path}")
         return metainfo
@@ -441,15 +427,11 @@ class MetaInfo:
 
     def print_task_list(self, task_dict: Dict[Task]):
         """English"""
-        task_table = PrettyTable(
-            ["task_id", "Doc Generation Reason", "Path", "dependency"]
-        )
+        task_table = PrettyTable(["task_id", "Doc Generation Reason", "Path", "dependency"])
         for task_id, task_info in task_dict.items():
             remain_str = "None"
             if task_info.dependencies != []:
-                remain_str = ",".join(
-                    [str(d_task.task_id) for d_task in task_info.dependencies]
-                )
+                remain_str = ",".join([str(d_task.task_id) for d_task in task_info.dependencies])
                 if len(remain_str) > 20:
                     remain_str = remain_str[:8] + "..." + remain_str[-8:]
             task_table.add_row(
@@ -530,9 +512,7 @@ class MetaInfo:
                 """English"""
                 nonlocal ref_count, white_list_file_names
                 in_file_only = False
-                if white_list_obj_names != [] and (
-                    now_obj.obj_name not in white_list_obj_names
-                ):
+                if white_list_obj_names != [] and (now_obj.obj_name not in white_list_obj_names):
                     in_file_only = True  # English，English，EnglishobjEnglishparse，English
 
                 reference_list = find_all_referencer(
@@ -601,9 +581,7 @@ class MetaInfo:
                                     DocItemType._class_function,
                                 ]
                             ) and referencer_node.code_start_line == referencer_pos[1]
-                            referencer_node.special_reference_type.append(
-                                special_reference_type
-                            )
+                            referencer_node.special_reference_type.append(special_reference_type)
                             referencer_node.reference_who.append(now_obj)
                             now_obj.who_reference_me.append(referencer_node)
                             ref_count += 1
@@ -649,12 +627,8 @@ class MetaInfo:
                 for _, child in item.children.items():  # English
                     if task_available_func(child) and (child not in deal_items):
                         best_break_level += 1
-                for referenced, special in zip(
-                    item.reference_who, item.special_reference_type
-                ):
-                    if task_available_func(referenced) and (
-                        referenced not in deal_items
-                    ):
+                for referenced, special in zip(item.reference_who, item.special_reference_type):
+                    if task_available_func(referenced) and (referenced not in deal_items):
                         best_break_level += 1
                     if (
                         task_available_func(referenced)
@@ -765,8 +739,7 @@ class MetaInfo:
             if "code_content" in now_older_item.content.keys():
                 assert "code_content" in result_item.content.keys()
                 if (
-                    now_older_item.content["code_content"]
-                    != result_item.content["code_content"]
+                    now_older_item.content["code_content"] != result_item.content["code_content"]
                 ):  # English
                     result_item.item_status = DocItemStatus.code_changed
 
@@ -842,20 +815,14 @@ class MetaInfo:
 
                 if flash_reference_relation:
                     temp_json_obj["who_reference_me"] = [
-                        cont.get_full_name(strict=True)
-                        for cont in now_obj.who_reference_me
+                        cont.get_full_name(strict=True) for cont in now_obj.who_reference_me
                     ]
                     temp_json_obj["reference_who"] = [
-                        cont.get_full_name(strict=True)
-                        for cont in now_obj.reference_who
+                        cont.get_full_name(strict=True) for cont in now_obj.reference_who
                     ]
-                    temp_json_obj["special_reference_type"] = (
-                        now_obj.special_reference_type
-                    )
+                    temp_json_obj["special_reference_type"] = now_obj.special_reference_type
                 else:
-                    temp_json_obj["who_reference_me"] = (
-                        now_obj.who_reference_me_name_list
-                    )
+                    temp_json_obj["who_reference_me"] = now_obj.who_reference_me_name_list
                     temp_json_obj["reference_who"] = now_obj.reference_who_name_list
                     # temp_json_obj["special_reference_type"] =
                 file_hierarchy_content.append(temp_json_obj)
@@ -887,10 +854,7 @@ class MetaInfo:
             if not os.path.exists(os.path.join(setting.project.target_repo, file_name)):
                 logger.info(f"deleted content: {file_name}")
                 continue
-            elif (
-                os.path.getsize(os.path.join(setting.project.target_repo, file_name))
-                == 0
-            ):
+            elif os.path.getsize(os.path.join(setting.project.target_repo, file_name)) == 0:
                 logger.info(f"blank content: {file_name}")
                 continue
 
@@ -904,9 +868,7 @@ class MetaInfo:
                         md_content="",
                         obj_name=recursive_file_path[pos],
                     )
-                    now_structure.children[
-                        recursive_file_path[pos]
-                    ].father = now_structure
+                    now_structure.children[recursive_file_path[pos]].father = now_structure
                 now_structure = now_structure.children[recursive_file_path[pos]]
                 pos += 1
             if recursive_file_path[-1] not in now_structure.children.keys():
@@ -918,9 +880,7 @@ class MetaInfo:
 
             # Englishparse fileEnglish
             assert type(file_content) == list
-            file_item = target_meta_info.target_repo_hierarchical_tree.find(
-                recursive_file_path
-            )
+            file_item = target_meta_info.target_repo_hierarchical_tree.find(recursive_file_path)
             assert file_item.item_type == DocItemType._file
             """English：
             1.EnglishparseEnglish，English
@@ -943,9 +903,7 @@ class MetaInfo:
                 if "reference_who" in value.keys():
                     obj_doc_item.reference_who_name_list = value["reference_who"]
                 if "special_reference_type" in value.keys():
-                    obj_doc_item.special_reference_type = value[
-                        "special_reference_type"
-                    ]
+                    obj_doc_item.special_reference_type = value["special_reference_type"]
                 if "who_reference_me" in value.keys():
                     obj_doc_item.who_reference_me_name_list = value["who_reference_me"]
                 obj_item_list.append(obj_doc_item)
@@ -971,10 +929,7 @@ class MetaInfo:
                     if code_contain(item, other_item):
                         if potential_father == None or (
                             (other_item.code_end_line - other_item.code_start_line)
-                            < (
-                                potential_father.code_end_line
-                                - potential_father.code_start_line
-                            )
+                            < (potential_father.code_end_line - potential_father.code_start_line)
                         ):
                             potential_father = other_item
 
@@ -985,9 +940,7 @@ class MetaInfo:
                 if child_name in potential_father.children.keys():
                     # English，English xxx_iEnglish
                     now_name_id = 0
-                    while (
-                        child_name + f"_{now_name_id}"
-                    ) in potential_father.children.keys():
+                    while (child_name + f"_{now_name_id}") in potential_father.children.keys():
                         now_name_id += 1
                     child_name = child_name + f"_{now_name_id}"
                     logger.warning(

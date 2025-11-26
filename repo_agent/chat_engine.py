@@ -76,25 +76,19 @@ class ChatEngine:
                 return ""
 
         code_type_tell = "Class" if code_type == "ClassDef" else "Function"
-        parameters_or_attribute = (
-            "attributes" if code_type == "ClassDef" else "parameters"
-        )
+        parameters_or_attribute = "attributes" if code_type == "ClassDef" else "parameters"
         have_return_tell = (
             "**Output Example**: Mock up a possible appearance of the code's return value."
             if have_return
             else ""
         )
         combine_ref_situation = (
-            "and combine it with its calling situation in the project,"
-            if referenced
-            else ""
+            "and combine it with its calling situation in the project," if referenced else ""
         )
 
         referencer_content = get_referencer_prompt(doc_item)
         reference_letter = get_referenced_prompt(doc_item)
-        has_relationship = get_relationship_description(
-            referencer_content, reference_letter
-        )
+        has_relationship = get_relationship_description(referencer_content, reference_letter)
 
         project_structure_prefix = ", and the related hierarchical structure of this project is as follows (The current object is marked with an *):"
 

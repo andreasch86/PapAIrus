@@ -1,4 +1,5 @@
 from enum import StrEnum
+from pathlib import Path
 from typing import Optional
 
 from iso639 import Language, LanguageNotFoundError
@@ -12,7 +13,6 @@ from pydantic import (
     field_validator,
 )
 from pydantic_settings import BaseSettings
-from pathlib import Path
 
 
 class LogLevel(StrEnum):
@@ -54,9 +54,7 @@ class ProjectSettings(BaseSettings):
     def set_log_level(cls, v: str) -> LogLevel:
         if isinstance(v, str):
             v = v.upper()  # Convert input to uppercase
-        if (
-            v in LogLevel._value2member_map_
-        ):  # Check if the converted value is in enum members
+        if v in LogLevel._value2member_map_:  # Check if the converted value is in enum members
             return LogLevel(v)
         raise ValueError(f"Invalid log level: {v}")
 
@@ -90,9 +88,7 @@ class Setting(BaseSettings):
 
 
 class SettingsManager:
-    _setting_instance: Optional[Setting] = (
-        None  # Private class attribute, initially None
-    )
+    _setting_instance: Optional[Setting] = None  # Private class attribute, initially None
 
     @classmethod
     def get_setting(cls):

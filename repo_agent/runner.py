@@ -33,21 +33,15 @@ class Runner:
             repo_path=self.setting.project.target_repo,
             project_hierarchy=self.setting.project.hierarchy_name,
         )
-        self.change_detector = ChangeDetector(
-            repo_path=self.setting.project.target_repo
-        )
+        self.change_detector = ChangeDetector(repo_path=self.setting.project.target_repo)
         self.chat_engine = ChatEngine(project_manager=self.project_manager)
 
         if not self.absolute_project_hierarchy_path.exists():
             file_path_reflections, jump_files = make_fake_files()
             self.meta_info = MetaInfo.init_meta_info(file_path_reflections, jump_files)
-            self.meta_info.checkpoint(
-                target_dir_path=self.absolute_project_hierarchy_path
-            )
+            self.meta_info.checkpoint(target_dir_path=self.absolute_project_hierarchy_path)
         else:  # English.project_hierarchy，English
-            self.meta_info = MetaInfo.from_checkpoint_path(
-                self.absolute_project_hierarchy_path
-            )
+            self.meta_info = MetaInfo.from_checkpoint_path(self.absolute_project_hierarchy_path)
 
         self.meta_info.checkpoint(  # English.project_doc_recordEnglish
             target_dir_path=self.absolute_project_hierarchy_path
@@ -77,9 +71,7 @@ class Runner:
         """English"""
         try:
             if not need_to_generate(doc_item, self.setting.project.ignore_list):
-                print(
-                    f"Content ignored/Document generated, skipping: {doc_item.get_full_name()}"
-                )
+                print(f"Content ignored/Document generated, skipping: {doc_item.get_full_name()}")
             else:
                 print(
                     f" -- Generating document  {Fore.LIGHTYELLOW_EX}{doc_item.item_type.name}: {doc_item.get_full_name()}{Style.RESET_ALL}"
@@ -89,9 +81,7 @@ class Runner:
                 )
                 doc_item.md_content.append(response_message)  # type: ignore
                 doc_item.item_status = DocItemStatus.doc_up_to_date
-                self.meta_info.checkpoint(
-                    target_dir_path=self.absolute_project_hierarchy_path
-                )
+                self.meta_info.checkpoint(target_dir_path=self.absolute_project_hierarchy_path)
         except Exception:
             logger.exception(
                 f"Document generation failed after multiple attempts, skipping: {doc_item.get_full_name()}"
@@ -138,13 +128,9 @@ class Runner:
             self.markdown_refresh()
 
             # English
-            self.meta_info.document_version = (
-                self.change_detector.repo.head.commit.hexsha
-            )
+            self.meta_info.document_version = self.change_detector.repo.head.commit.hexsha
             self.meta_info.in_generation_process = False
-            self.meta_info.checkpoint(
-                target_dir_path=self.absolute_project_hierarchy_path
-            )
+            self.meta_info.checkpoint(target_dir_path=self.absolute_project_hierarchy_path)
             logger.info(
                 f"Successfully generated {before_task_len - len(task_manager.task_dict)} documents."
             )
@@ -159,8 +145,7 @@ class Runner:
         with self.runner_lock:
             # English markdown English
             markdown_folder = (
-                Path(self.setting.project.target_repo)
-                / self.setting.project.markdown_docs_name
+                Path(self.setting.project.target_repo) / self.setting.project.markdown_docs_name
             )
 
             # English
@@ -196,9 +181,7 @@ class Runner:
                 markdown += self.to_markdown(child, 2)
 
             if not markdown:
-                logger.warning(
-                    f"No markdown content generated for: {file_item.get_full_name()}"
-                )
+                logger.warning(f"No markdown content generated for: {file_item.get_full_name()}")
                 continue
 
             # English
@@ -232,9 +215,7 @@ class Runner:
 
     def to_markdown(self, item, now_level: int) -> str:
         """English markdown English"""
-        markdown_content = (
-            "#" * now_level + f" {item.item_type.to_str()} {item.obj_name}"
-        )
+        markdown_content = "#" * now_level + f" {item.item_type.to_str()} {item.obj_name}"
         if "params" in item.content.keys() and item.content["params"]:
             markdown_content += f"({', '.join(item.content['params'])})"
         markdown_content += "\n"
@@ -275,9 +256,7 @@ class Runner:
             )  # EnglishmetaEnglish（English）English.project_doc_recordEnglish
             return
 
-        if (
-            not self.meta_info.in_generation_process
-        ):  # English，English
+        if not self.meta_info.in_generation_process:  # English，English
             logger.info("Starting to detect changes.")
 
             """English
@@ -286,7 +265,7 @@ class Runner:
             - English：Englishdoc
             - English、English：EnglishdocEnglish(English，English)
             - English：Englishobj-docEnglish
-            
+
             mergeEnglishnew_meta_infoEnglish：
             1.English，Englishmetainfo mergeEnglish
             2.Englishobj，EnglishmetaEnglish，English
@@ -296,7 +275,9 @@ class Runner:
             new_meta_info.load_doc_from_older_meta(self.meta_info)
 
             self.meta_info = new_meta_info  # Englishmeta_infoEnglishnewEnglish
-            self.meta_info.in_generation_process = True  # Englishin_generation_processEnglishTrue，EnglishGenerating document English
+            self.meta_info.in_generation_process = (
+                True  # Englishin_generation_processEnglishTrue，EnglishGenerating document English
+            )
 
         # English
         check_task_available_func = partial(
@@ -314,9 +295,7 @@ class Runner:
             )
         self.meta_info.print_task_list(task_manager.task_dict)
         if task_manager.all_success:
-            logger.info(
-                "No tasks in the queue, all documents are completed and up to date."
-            )
+            logger.info("No tasks in the queue, all documents are completed and up to date.")
 
         threads = [
             threading.Thread(
@@ -337,21 +316,19 @@ class Runner:
             target_dir_path=self.absolute_project_hierarchy_path,
             flash_reference_relation=True,
         )
-        logger.info(f"Doc has been forwarded to the latest version")
+        logger.info("Doc has been forwarded to the latest version")
 
         self.markdown_refresh()
         delete_fake_files()
 
-        logger.info(f"Starting to git-add DocMetaInfo and newly generated Docs")
+        logger.info("Starting to git-add DocMetaInfo and newly generated Docs")
         time.sleep(1)
 
         # EnglishrunEnglishMarkdownEnglish（English）English
         git_add_result = self.change_detector.add_unstaged_files()
 
         if len(git_add_result) > 0:
-            logger.info(
-                f"Added {[file for file in git_add_result]} to the staging area."
-            )
+            logger.info(f"Added {[file for file in git_add_result]} to the staging area.")
 
         # self.git_commit(f"Update documentation for {file_handler.file_path}") # English
 
@@ -393,9 +370,7 @@ class Runner:
             f"The structural information of the newly added file {file_handler.file_path} has been written into a JSON file."
         )
         # EnglishjsonEnglishmarkdownEnglish
-        markdown = file_handler.convert_to_markdown_file(
-            file_path=file_handler.file_path
-        )
+        markdown = file_handler.convert_to_markdown_file(file_path=file_handler.file_path)
         # EnglishmarkdownEnglish.mdEnglish
         file_handler.write_file(
             os.path.join(
@@ -421,9 +396,7 @@ class Runner:
             None
         """
 
-        file_handler = FileHandler(
-            repo_path=repo_path, file_path=file_path
-        )  # English
+        file_handler = FileHandler(repo_path=repo_path, file_path=file_path)  # English
         # EnglishpyEnglish
         source_code = file_handler.read_file()
         changed_lines = self.change_detector.parse_diffs(
@@ -445,17 +418,13 @@ class Runner:
                 json_data[file_handler.file_path], file_handler, changes_in_pyfile
             )
             # EnglishfileEnglishjsonEnglish
-            with open(
-                self.project_manager.project_hierarchy, "w", encoding="utf-8"
-            ) as f:
+            with open(self.project_manager.project_hierarchy, "w", encoding="utf-8") as f:
                 json.dump(json_data, f, indent=4, ensure_ascii=False)
 
             logger.info(f"English{file_handler.file_path}EnglishjsonEnglish。")
 
             # EnglishjsonEnglishmarkdownEnglish
-            markdown = file_handler.convert_to_markdown_file(
-                file_path=file_handler.file_path
-            )
+            markdown = file_handler.convert_to_markdown_file(file_path=file_handler.file_path)
             # EnglishmarkdownEnglish.mdEnglish
             file_handler.write_file(
                 os.path.join(
@@ -510,26 +479,22 @@ class Runner:
             if current_obj_name in file_dict:
                 # English，English
                 file_dict[current_obj_name]["type"] = current_obj_info["type"]
-                file_dict[current_obj_name]["code_start_line"] = current_obj_info[
-                    "code_start_line"
-                ]
-                file_dict[current_obj_name]["code_end_line"] = current_obj_info[
-                    "code_end_line"
-                ]
+                file_dict[current_obj_name]["code_start_line"] = current_obj_info["code_start_line"]
+                file_dict[current_obj_name]["code_end_line"] = current_obj_info["code_end_line"]
                 file_dict[current_obj_name]["parent"] = current_obj_info["parent"]
-                file_dict[current_obj_name]["name_column"] = current_obj_info[
-                    "name_column"
-                ]
+                file_dict[current_obj_name]["name_column"] = current_obj_info["name_column"]
             else:
                 # English，English
                 file_dict[current_obj_name] = current_obj_info
 
         # English：English
         for obj_name, _ in changes_in_pyfile["added"]:
-            for current_object in current_objects.values():  # Englishnew_objectsEnglishfind_all_referencerEnglish。Englishchanges_in_pyfile['added']English，English
-                if (
-                    obj_name == current_object["name"]
-                ):  # EnglishaddedEnglishnew_objectsEnglish
+            for (
+                current_object
+            ) in (
+                current_objects.values()
+            ):  # Englishnew_objectsEnglishfind_all_referencerEnglish。Englishchanges_in_pyfile['added']English，English
+                if obj_name == current_object["name"]:  # EnglishaddedEnglishnew_objectsEnglish
                     # English
                     referencer_obj = {
                         "obj_name": obj_name,
@@ -540,18 +505,14 @@ class Runner:
                             column_number=current_object["name_column"],
                         ),
                     }
-                    referencer_list.append(
-                        referencer_obj
-                    )  # English，English
+                    referencer_list.append(referencer_obj)  # English，English
 
         with ThreadPoolExecutor(max_workers=5) as executor:
             # English
             futures = []
             for changed_obj in changes_in_pyfile["added"]:  # English
                 for ref_obj in referencer_list:
-                    if (
-                        changed_obj[0] == ref_obj["obj_name"]
-                    ):  # Englishreferencer_listEnglish！
+                    if changed_obj[0] == ref_obj["obj_name"]:  # Englishreferencer_listEnglish！
                         future = executor.submit(
                             self.update_object,
                             file_dict,
@@ -585,9 +546,7 @@ class Runner:
         """
         if obj_name in file_dict:
             obj = file_dict[obj_name]
-            response_message = self.chat_engine.generate_doc(
-                obj, file_handler, obj_referencer_list
-            )
+            response_message = self.chat_engine.generate_doc(obj, file_handler, obj_referencer_list)
             obj["md_content"] = response_message.content
 
     def get_new_objects(self, file_handler):
@@ -607,9 +566,7 @@ class Runner:
         current_version, previous_version = file_handler.get_modified_file_versions()
         parse_current_py = file_handler.get_functions_and_classes(current_version)
         parse_previous_py = (
-            file_handler.get_functions_and_classes(previous_version)
-            if previous_version
-            else []
+            file_handler.get_functions_and_classes(previous_version) if previous_version else []
         )
 
         current_obj = {f[1] for f in parse_current_py}

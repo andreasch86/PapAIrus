@@ -1,7 +1,9 @@
+# mypy: ignore-errors
+
+"""Gradio UI helpers."""
+
 import gradio as gr
 import markdown
-
-from repo_agent.log import logger
 
 
 class GradioInterface:
@@ -33,7 +35,7 @@ class GradioInterface:
                         }
                     </style>
                     <div class="outer-box"">
-        
+
         """
         self.cssb = """
                         </div>
@@ -44,9 +46,7 @@ class GradioInterface:
 
     def wrapper_respond(self, msg_input, system_input):
         # English respond English
-        msg, output1, output2, output3, code, codex = self.respond(
-            msg_input, system_input
-        )
+        msg, output1, output2, output3, code, codex = self.respond(msg_input, system_input)
         output1 = markdown.markdown(str(output1))
         output2 = markdown.markdown(str(output2))
         code = markdown.markdown(str(code))
@@ -95,7 +95,7 @@ class GradioInterface:
                                         <div class="title">Response</div>
                                             <div class="inner-box">
                                                 <div class="content">
-                      
+
                                             """
             + self.cssb
         )
@@ -105,7 +105,7 @@ class GradioInterface:
                                         <div class="title">Embedding Recall</div>
                                             <div class="inner-box">
                                                 <div class="content">
-                                    
+
                                             """
             + self.cssb
         )
@@ -116,7 +116,7 @@ class GradioInterface:
                                         <div class="title">Code</div>
                                             <div class="inner-box">
                                                 <div class="content">
-                                   
+
                                             """
             + self.cssb
         )
@@ -125,19 +125,18 @@ class GradioInterface:
 
     def setup_gradio_interface(self):
         with gr.Blocks() as demo:
-            gr.Markdown("""
+            gr.Markdown(
+                """
                 # RepoAgent: Chat with doc
-            """)
+            """
+            )
             with gr.Tab("main chat"):
                 with gr.Row():
                     with gr.Column():
                         msg = gr.Textbox(label="Question Input", lines=4)
-                        system = gr.Textbox(
-                            label="(Optional)insturction editing", lines=4
-                        )
+                        system = gr.Textbox(label="(Optional)insturction editing", lines=4)
                         btn = gr.Button("Submit")
                         btnc = gr.ClearButton()
-                        btnr = gr.Button("record")
 
                     output1 = gr.HTML(
                         self.cssa
@@ -145,7 +144,7 @@ class GradioInterface:
                                         <div class="title">Response</div>
                                             <div class="inner-box">
                                                 <div class="content">
-                      
+
                                             """
                         + self.cssb
                     )
@@ -158,7 +157,7 @@ class GradioInterface:
                                         <div class="title">Embedding Recall</div>
                                             <div class="inner-box">
                                                 <div class="content">
-                                    
+
                                             """
                             + self.cssb
                         )
@@ -168,7 +167,7 @@ class GradioInterface:
                                         <div class="title">Code</div>
                                             <div class="inner-box">
                                                 <div class="content">
-                                   
+
                                             """
                         + self.cssb
                     )
@@ -182,9 +181,7 @@ class GradioInterface:
                 inputs=[msg, system],
                 outputs=[msg, output1, output2, output3, code, output4],
             )
-            btnc.click(
-                self.clean, outputs=[msg, output1, output2, output3, code, output4]
-            )
+            btnc.click(self.clean, outputs=[msg, output1, output2, output3, code, output4])
             msg.submit(
                 self.wrapper_respond,
                 inputs=[msg, system],
@@ -201,7 +198,7 @@ if __name__ == "__main__":
     def respond_function(msg, system):
         RAG = """
 
-        
+
         """
         return msg, RAG, "Embedding_recall_output", "Key_words_output", "Code_output"
 

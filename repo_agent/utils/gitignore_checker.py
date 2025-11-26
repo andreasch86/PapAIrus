@@ -1,6 +1,5 @@
 import fnmatch
 import os
-import fnmatch
 
 
 class GitignoreChecker:
@@ -30,9 +29,7 @@ class GitignoreChecker:
                 gitignore_content = file.read()
         except FileNotFoundError:
             # Fallback to the default .gitignore path if the specified file is not found
-            default_path = os.path.join(
-                os.path.dirname(__file__), "..", "..", ".gitignore"
-            )
+            default_path = os.path.join(os.path.dirname(__file__), "..", "..", ".gitignore")
             with open(default_path, "r", encoding="utf-8") as file:
                 gitignore_content = file.read()
 
@@ -109,17 +106,13 @@ class GitignoreChecker:
         not_ignored_files = []
         for root, dirs, files in os.walk(self.directory):
             dirs[:] = [
-                d
-                for d in dirs
-                if not self._is_ignored(d, self.folder_patterns, is_dir=True)
+                d for d in dirs if not self._is_ignored(d, self.folder_patterns, is_dir=True)
             ]
 
             for file in files:
                 file_path = os.path.join(root, file)
                 relative_path = os.path.relpath(file_path, self.directory)
-                if not self._is_ignored(
-                    file, self.file_patterns
-                ) and file_path.endswith(".py"):
+                if not self._is_ignored(file, self.file_patterns) and file_path.endswith(".py"):
                     not_ignored_files.append(relative_path)
 
         return not_ignored_files

@@ -6,13 +6,13 @@ from pydantic import ValidationError
 
 from repo_agent.doc_meta_info import DocItem, MetaInfo
 from repo_agent.log import logger, set_logger_level_from_config
-from repo_agent.runner import Runner, delete_fake_files
-from repo_agent.settings import SettingsManager, LogLevel
+from repo_agent.runner import Runner
+from repo_agent.settings import LogLevel, SettingsManager
 from repo_agent.utils.meta_info_utils import delete_fake_files, make_fake_files
 
 try:
     version_number = metadata.version("papairus")
-except metadata.PackageNotFoundError:
+except metadata.PackageNotFoundError:  # pragma: no cover
     version_number = "0.0.0"
 
 
@@ -37,9 +37,7 @@ def handle_setting_error(e: ValidationError):
         click.echo(message, err=True, color=True)
 
     raise click.ClickException(
-        click.style(
-            "Program terminated due to configuration errors.", fg="red", bold=True
-        )
+        click.style("Program terminated due to configuration errors.", fg="red", bold=True)
     )
 
 
@@ -204,7 +202,7 @@ def run(
 
     try:
         # Fetch and validate the settings using the SettingsManager
-        setting = SettingsManager.initialize_with_params(
+        _ = SettingsManager.initialize_with_params(
             target_repo=target_repo_path,
             hierarchy_name=hierarchy_path,
             markdown_docs_name=markdown_docs_path,
@@ -286,7 +284,7 @@ def chat_with_repo():
     """
     try:
         # Fetch and validate the settings using the SettingsManager
-        setting = SettingsManager.get_setting()
+        _ = SettingsManager.get_setting()
     except ValidationError as e:
         # Handle configuration errors if the settings are invalid
         handle_setting_error(e)
