@@ -166,7 +166,6 @@ prompt_output/
 # VS Code
 .vscode/
 
-# RepoAgent
 log.txt
 .chroma_db
 config.yml

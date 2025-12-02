@@ -127,7 +127,7 @@ class GradioInterface:
         with gr.Blocks() as demo:
             gr.Markdown(
                 """
-                # RepoAgent: Chat with doc
+                # PapAIrus: Chat with doc
             """
             )
             with gr.Tab("main chat"):
