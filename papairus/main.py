@@ -5,6 +5,7 @@ import git
 from pydantic import ValidationError
 
 from papairus.doc_meta_info import DocItem, MetaInfo
+from papairus.exceptions import NoChangesWarning
 from papairus.log import logger, set_logger_level_from_config
 from papairus.runner import Runner
 from papairus.settings import LogLevel, SettingsManager
@@ -195,8 +196,8 @@ def run(
         except TypeError:
             pass
 
-        if not repo.is_dirty(untracked_files=True):
-            raise click.ClickException(
+        if repo and not repo.is_dirty(untracked_files=True):
+            raise NoChangesWarning(
                 "No code changes detected on this branch; PapAIrus will not run."
             )
 
