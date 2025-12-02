@@ -18,6 +18,7 @@ except ImportError:  # pragma: no cover - optional dependency
 from types import SimpleNamespace
 
 import requests
+from requests import HTTPError
 
 from papairus.settings import ChatCompletionSettings
 
@@ -73,7 +74,19 @@ class VertexGeminiLLM:
             json=payload,
             timeout=self.timeout,
         )
-        response.raise_for_status()
+        try:
+            response.raise_for_status()
+        except HTTPError as exc:  # pragma: no cover - error path exercised in tests
+            status_code = getattr(exc.response, "status_code", None)
+            if status_code == 404:
+                raise ValueError(
+                    "Gemini model not found. Confirm the model name (e.g., "
+                    "gemini-2.0-flash, gemini-2.5-flash, gemini-1.5-pro-latest) "
+                    "and that it is available for API-key access. "
+                    f"Endpoint: {endpoint}"
+                ) from exc
+
+            raise
         data = response.json()
         candidates = data.get("candidates", [])
         if not candidates:

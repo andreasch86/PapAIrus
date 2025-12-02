@@ -1,4 +1,6 @@
 import pytest
+import requests
+from types import SimpleNamespace
 
 from papairus.llm_provider import build_embedding_model, build_llm
 from papairus.settings import ChatCompletionSettings
@@ -71,3 +73,37 @@ def test_build_llm_uses_gemini(monkeypatch):
     assert llm.model == "gemini-2.5-flash"
     assert llm.api_key == "dummy-key"
     assert llm.timeout == 30
+
+
+def test_vertex_gemini_llm_raises_clear_error_on_404(monkeypatch):
+    from papairus.llm_provider import VertexGeminiLLM
+
+    class FakeResponse:
+        def __init__(self):
+            self.status_code = 404
+            self.text = "model not found"
+            self.url = "https://aiplatform.googleapis.com/v1/publishers/google/models/gemini-3-flash:generateContent"
+
+        def raise_for_status(self):
+            raise requests.HTTPError(response=self)
+
+        def json(self):  # pragma: no cover - not used when raising
+            return {}
+
+    def fake_post(*args, **kwargs):
+        return FakeResponse()
+
+    monkeypatch.setattr("requests.post", fake_post)
+
+    llm = VertexGeminiLLM(
+        api_key="dummy",
+        base_url="https://aiplatform.googleapis.com/v1",
+        model="gemini-3-flash",
+        temperature=0.0,
+        timeout=30,
+    )
+
+    with pytest.raises(ValueError) as excinfo:
+        llm.chat([SimpleNamespace(content="hello")])
+
+    assert "Gemini model not found" in str(excinfo.value)
