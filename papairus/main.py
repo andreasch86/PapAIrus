@@ -47,9 +47,9 @@ def handle_setting_error(e: ValidationError):
 @click.option(
     "--model",
     "-m",
-    default="gemini-3-flash",
+    default="gemini-2.5-flash",
     show_default=True,
-    help="Specifies the model to use for completion (gemma-local or gemini-3-flash).",
+    help="Specifies the model to use for completion (gemma-local or any Gemini model starting with 'gemini-').",
     type=str,
 )
 @click.option(
@@ -71,7 +71,7 @@ def handle_setting_error(e: ValidationError):
 @click.option(
     "--base-url",
     "-b",
-    default="https://generativelanguage.googleapis.com/v1beta",
+    default="https://aiplatform.googleapis.com/v1",
     show_default=True,
     help="The base URL for Gemini API calls.",
     type=str,

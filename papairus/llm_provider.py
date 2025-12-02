@@ -97,7 +97,7 @@ class VertexGeminiLLM:
 
 def build_llm(chat_settings: ChatCompletionSettings):
     """Return a configured LLM implementation for the given settings."""
-    if chat_settings.model == "gemini-3-flash":
+    if chat_settings.model.startswith("gemini-"):
         api_key = chat_settings.gemini_api_key
         if api_key is None:
             raise ValueError("gemini_api_key must be provided for Gemini models")
@@ -124,7 +124,7 @@ def build_llm(chat_settings: ChatCompletionSettings):
 
 def build_embedding_model(chat_settings: ChatCompletionSettings):
     """Return an embedding model implementation aligned with the chat settings."""
-    if chat_settings.model == "gemini-3-flash":
+    if chat_settings.model.startswith("gemini-"):
         gemini_embedding_cls = _require_dependency(
             GeminiEmbedding, "llama-index-embeddings-gemini"
         )

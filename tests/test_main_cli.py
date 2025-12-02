@@ -141,7 +141,7 @@ def test_run_handles_invalid_repo_and_runs(monkeypatch, tmp_path):
     runner = CliRunner()
     result = runner.invoke(
         main.run,
-        ["--target-repo-path", str(repo_path), "--allow-main", "--model", "gemini-3-flash"],
+        ["--target-repo-path", str(repo_path), "--allow-main", "--model", "gemini-2.5-flash"],
     )
 
     assert result.exit_code == 0

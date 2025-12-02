@@ -60,7 +60,7 @@ if __name__ == "__main__":
     llm = VertexGeminiLLM(
         api_key=api_key,
         base_url="https://aiplatform.googleapis.com/v1",
-        model="gemini-3-flash",
+        model="gemini-2.5-flash",
         temperature=0.2,
         timeout=60,
     )

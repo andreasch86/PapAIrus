@@ -35,7 +35,7 @@ Run from the target repository root (or pass `--target-repo-path`):
 # Gemini cloud generation
 export GEMINI_API_KEY=your_gemini_key
 
-papairus run --model gemini-3-flash --allow-main --telemetry
+papairus run --model gemini-2.5-flash --allow-main --telemetry
 
 # Local Gemma via Ollama
 papairus run --model gemma-local --base-url http://localhost:11434 --dry-run
