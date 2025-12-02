@@ -104,8 +104,12 @@ class VertexGeminiLLM:
             completion_tokens=usage.get("candidates_token_count", 0),
             total_tokens=usage.get("total_token_count", 0),
         )
-        message.raw = SimpleNamespace(usage=raw_usage)  # type: ignore[attr-defined]
-        return message
+
+        # Mirror the llama-index ChatResponse shape expected by ChatEngine.
+        return SimpleNamespace(
+            message=message,
+            raw=SimpleNamespace(usage=raw_usage),
+        )
 
 
 def build_llm(chat_settings: ChatCompletionSettings):

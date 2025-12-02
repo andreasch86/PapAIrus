@@ -2,7 +2,7 @@ from enum import StrEnum
 from pathlib import Path
 from typing import Optional
 
-from iso639 import Language, LanguageNotFoundError
+from iso639 import languages
 from pydantic import (
     DirectoryPath,
     Field,
@@ -39,13 +39,21 @@ class ProjectSettings(BaseSettings):
         normalized = v.strip().lower()
         if "english" in normalized:
             return "English (UK)"
-        try:
-            language_name = Language.match(v).name
-        except LanguageNotFoundError:
+        language = None
+        for key in ("name", "part1", "part3"):
+            try:
+                language = languages.get(**{key: v})
+            except KeyError:
+                language = None
+            if language:
+                break
+
+        if language is None:
             raise ValueError(
                 "Invalid language input. Please enter a valid ISO 639 code or language name."
             )
-        if language_name.lower() != "english":
+
+        if language.name.lower() != "english":
             raise ValueError("PapAIrus only supports UK English output.")
         return "English (UK)"
 
