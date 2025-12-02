@@ -1,4 +1,4 @@
-from importlib import metadata
+from importlib import import_module, metadata
 from pathlib import Path
 
 import click
@@ -292,7 +292,14 @@ def chat_with_repo():
         handle_setting_error(e)
         return
 
-    from papairus.chat_with_repo.main import main as chat_main
+    try:
+        chat_module = import_module("papairus.chat_with_repo.main")
+    except ModuleNotFoundError:
+        chat_module = import_module("papairus.chat_with_repo")
+
+    chat_main = getattr(chat_module, "main", None)
+    if not callable(chat_main):  # pragma: no cover - defensive guard
+        raise click.ClickException("papairus.chat_with_repo.main is not callable")
 
     chat_main()
 
