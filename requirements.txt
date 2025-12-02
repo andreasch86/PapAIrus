@@ -479,15 +479,10 @@ kubernetes==31.0.0 \
 llama-index-core==0.12.8 \
     --hash=sha256:3b360437b4ae47b7bd1733f6492a95126e6739c7a2fd2b649ebe8bb3afea7143 \
     --hash=sha256:7ebecbdaa1d5b6a320c050bf90525605ac03b242d26ad55f0e00a0e1df69e070
-llama-index-embeddings-openai==0.3.1 \
-    --hash=sha256:1368aad3ce24cbaed23d5ad251343cef1eb7b4a06d6563d6606d59cb347fef20 \
-    --hash=sha256:f15a3d13da9b6b21b8bd51d337197879a453d1605e625a1c6d45e741756c0290
-llama-index-llms-openai==0.3.12 \
-    --hash=sha256:08be76b9e649f6085e93292504074728a6531eb7f8930eaf40a2fce70a9f59df \
-    --hash=sha256:1880273a7e409c05f1dbccdbac5ce3c214771901cd3696aeb556a29dfed8477a
-llama-index-llms-openai-like==0.3.3 \
-    --hash=sha256:20051625720053e5d511d3771affee17b5373cc055b86ecbfc267c631c2dc406 \
-    --hash=sha256:bea042017291d933ac93a0c487c8daad25a70e6f6bf2a5440150f6c18b246df6
+llama-index-embeddings-gemini==0.3.1 \
+    --hash=sha256:fd2b391c65f82550d988d346cab512b54336fe6557757b418b3293c9e26f94b0
+llama-index-llms-gemini==0.4.0 \
+    --hash=sha256:b7369dfb979c136482c06b8b24c3cedaa74aa92210407491ae1fff761e1f85c0
 llama-index-vector-stores-chroma==0.4.1 \
     --hash=sha256:42200af4fa5c8df820b865825d1b506cecb922c8fbd7421eda8a5609b390c1d5 \
     --hash=sha256:70ee74ccf304adda04171d014e483759c68a1c92f679ea2ca2e6b6f45b6fef08
@@ -706,9 +701,6 @@ onnxruntime==1.20.1 \
     --hash=sha256:f1f56e898815963d6dc4ee1c35fc6c36506466eff6d16f3cb9848cea4e8c8172 \
     --hash=sha256:f6243e34d74423bdd1edf0ae9596dd61023b260f546ee17d701723915f06a9f7 \
     --hash=sha256:fb44b08e017a648924dbe91b82d89b0c105b1adcfe31e90d1dc06b8677ad37be
-openai==1.58.1 \
-    --hash=sha256:e2910b1170a6b7f88ef491ac3a42c387f08bd3db533411f7ee391d166571d63c \
-    --hash=sha256:f5a035fd01e141fc743f4b0e02c41ca49be8fab0866d3b67f5f29b4f4d3c0973
 opentelemetry-api==1.29.0 \
     --hash=sha256:5fcd94c4141cc49c736271f3e1efb777bebe9cc535759c54c936cca4f1b312b8 \
     --hash=sha256:d04a6cf78aad09614f52964ecb38021e248f5714dc32c2e0d8fd99517b4d69cf
@@ -998,6 +990,8 @@ pyreadline3==3.5.4; sys_platform == "win32" and python_version >= "3.8" \
 pytest==7.4.4 \
     --hash=sha256:2cf0005922c6ace4a3e2ec8b4080eb0d9753fdc93107415332f50ce9e7994280 \
     --hash=sha256:b090cdf5ed60bf4c45261be03239c2c1c22df034fbffe691abe93cd80cea01d8
+pytest-cov==6.0.0 \
+    --hash=sha256:eee6f1b9e61008bd34975a4d5bab25801eb31898b032dd55addc93e96fcaaa35
 pytest-mock==3.14.0 \
     --hash=sha256:0b72c38033392a5f4621342fe11e9219ac11ec9d375f8e2a0c164539e0d70f6f \
     --hash=sha256:2719255a1efeceadbc056d6bf3df3d1c5015530fb40cf347c0f9afac88410bd0

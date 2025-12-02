@@ -31,6 +31,14 @@ def test_model_restriction():
         ChatCompletionSettings(model="gpt-4")
 
 
+def test_gemini_key_required_only_for_gemini():
+    with pytest.raises(ValidationError):
+        ChatCompletionSettings(model="gemini-3-flash", gemini_api_key=None)
+
+    settings = ChatCompletionSettings(model="gemma-local", gemini_api_key=None)
+    assert settings.gemini_api_key is None
+
+
 def test_log_level_validation_accepts_case_insensitive():
     settings = ProjectSettings(target_repo=".", log_level="debug")
     assert settings.log_level == LogLevel.DEBUG
@@ -53,15 +61,15 @@ def test_log_level_validator_handles_non_string():
 
 
 def test_base_url_casts_to_str():
-    settings = ChatCompletionSettings(openai_base_url="https://example.com", openai_api_key="key")
-    assert isinstance(settings.openai_base_url, str)
+    settings = ChatCompletionSettings(gemini_base_url="https://example.com", gemini_api_key="key")
+    assert isinstance(settings.gemini_base_url, str)
 
 
 def test_settings_manager_initialization(temp_repo):
     # Uses fixture to preconfigure settings
     setting = SettingsManager.get_setting()
     assert setting.project.target_repo.exists()
-    assert setting.chat_completion.model == "gemini-3.5-flash"
+    assert setting.chat_completion.model == "gemini-3-flash"
 
 
 def test_settings_manager_initialize_with_params_sets_instance(tmp_path):
@@ -75,10 +83,10 @@ def test_settings_manager_initialize_with_params_sets_instance(tmp_path):
         language="English",
         max_thread_count=2,
         log_level="INFO",
-        model="gemini-3.5-flash",
+        model="gemini-3-flash",
         temperature=0.3,
         request_timeout=30,
-        openai_base_url="https://example.com",
+        gemini_base_url="https://example.com",
         telemetry_opt_in=True,
     )
     setting = SettingsManager.get_setting()

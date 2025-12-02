@@ -28,7 +28,7 @@ def stub_settings(repo_path):
         log_level=LogLevel.INFO,
         telemetry_opt_in=False,
     )
-    chat_settings = ChatCompletionSettings(openai_api_key="secret")
+    chat_settings = ChatCompletionSettings(gemini_api_key="secret")
     return Setting(project=project_settings, chat_completion=chat_settings)
 
 
@@ -141,7 +141,7 @@ def test_run_handles_invalid_repo_and_runs(monkeypatch, tmp_path):
     runner = CliRunner()
     result = runner.invoke(
         main.run,
-        ["--target-repo-path", str(repo_path), "--allow-main", "--model", "gemini-3.5-flash"],
+        ["--target-repo-path", str(repo_path), "--allow-main", "--model", "gemini-3-flash"],
     )
 
     assert result.exit_code == 0
@@ -418,7 +418,7 @@ def test_chat_with_repo_handles_validation_error(monkeypatch):
 def test_handle_setting_error_outputs_messages(capsys):
     error = types.SimpleNamespace(
         errors=lambda: [
-            {"loc": ["project", "openai_api_key"], "type": "missing", "msg": "field required"},
+            {"loc": ["project", "gemini_api_key"], "type": "missing", "msg": "field required"},
             {"loc": ["project", "language"], "type": "value_error", "msg": "bad language"},
         ]
     )
@@ -427,7 +427,7 @@ def test_handle_setting_error_outputs_messages(capsys):
         main.handle_setting_error(error)
 
     captured = capsys.readouterr()
-    assert "Missing required field `openai_api_key`" in captured.err
+    assert "Missing required field `gemini_api_key`" in captured.err
     assert "bad language" in captured.err
 
 
