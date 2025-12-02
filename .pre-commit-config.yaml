@@ -1,4 +1,4 @@
-files: ^repo_agent/
+files: ^papairus/
 
 repos:
   - repo: https://github.com/pre-commit/pre-commit-hooks
@@ -16,7 +16,7 @@ repos:
     rev: 7.1.0
     hooks:
       - id: flake8
-        args: [ --config, repo_agent/setup.cfg ]
+        args: [ --config, papairus/setup.cfg ]
 
   - repo: https://github.com/PyCQA/isort
     rev: 5.13.2
@@ -39,8 +39,8 @@ repos:
           - --ignore-missing-imports
           - --allow-untyped-defs
           - --exclude
-          - repo_agent/(chat_with_repo/.*|doc_meta_info\.py)
-          - repo_agent/
+          - papairus/(chat_with_repo/.*|doc_meta_info\.py)
+          - papairus/
         additional_dependencies:
           - pydantic[mypy]==2.6.1
           - pydantic-extra-types==2.10.5

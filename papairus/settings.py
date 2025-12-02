@@ -60,25 +60,41 @@ class ProjectSettings(BaseSettings):
 
 
 class ChatCompletionSettings(BaseSettings):
-    model: str = "gemini-3.5-flash"  # Only Gemini (API) or local Gemma are allowed.
+    model: str = "gemini-3-flash"  # Only Gemini (API) or local Gemma are allowed.
     temperature: PositiveFloat = 0.2
     request_timeout: PositiveInt = 60
-    openai_base_url: str = "https://generativelanguage.googleapis.com/v1beta"
-    openai_api_key: SecretStr = Field(..., exclude=True)
+    gemini_base_url: str = "https://generativelanguage.googleapis.com/v1beta"
+    gemini_api_key: Optional[SecretStr] = Field(None, exclude=True)
+    ollama_base_url: str = "http://localhost:11434"
+    ollama_model: str = "gemma2:latest"
+    ollama_embedding_model: str = "nomic-embed-text"
 
-    @field_validator("openai_base_url", mode="before")
+    @field_validator("gemini_base_url", mode="before")
     @classmethod
-    def convert_base_url_to_str(cls, openai_base_url: HttpUrl) -> str:
-        return str(openai_base_url)
+    def convert_base_url_to_str(cls, gemini_base_url: HttpUrl) -> str:
+        return str(gemini_base_url)
+
+    @field_validator("ollama_base_url", mode="before")
+    @classmethod
+    def convert_ollama_base_url_to_str(cls, ollama_base_url: HttpUrl | str) -> str:
+        return str(ollama_base_url)
 
     @field_validator("model")
     @classmethod
     def validate_model(cls, value: str) -> str:
-        allowed_models = {"gemini-3.5-flash", "gemma-local"}
+        allowed_models = {"gemini-3-flash", "gemma-local"}
         if value not in allowed_models:
             raise ValueError(
-                "Model must be one of: gemma-local (self-hosted) or gemini-3.5-flash (API)."
+                "Model must be one of: gemma-local (self-hosted) or gemini-3-flash (API)."
             )
+        return value
+
+    @field_validator("gemini_api_key")
+    @classmethod
+    def validate_api_key(cls, value: Optional[SecretStr], info):
+        model = info.data.get("model")
+        if model == "gemini-3-flash" and value is None:
+            raise ValueError("gemini_api_key is required when using Gemini models")
         return value
 
 
@@ -109,7 +125,7 @@ class SettingsManager:
         model: str,
         temperature: float,
         request_timeout: int,
-        openai_base_url: str,
+        gemini_base_url: str,
         telemetry_opt_in: bool,
     ):
         project_settings = ProjectSettings(
@@ -127,7 +143,7 @@ class SettingsManager:
             model=model,
             temperature=temperature,
             request_timeout=request_timeout,
-            openai_base_url=openai_base_url,
+            gemini_base_url=gemini_base_url,
         )
 
         cls._setting_instance = Setting(

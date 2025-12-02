@@ -3,14 +3,13 @@ from llama_index.core import Document, StorageContext, VectorStoreIndex, get_res
 from llama_index.core.node_parser import SemanticSplitterNodeParser, SentenceSplitter
 from llama_index.core.query_engine import RetrieverQueryEngine
 from llama_index.core.retrievers import VectorIndexRetriever
-from llama_index.embeddings.openai import OpenAIEmbedding
 from llama_index.vector_stores.chroma import ChromaVectorStore
 
 from papairus.log import logger
 
 
 class VectorStoreManager:
-    def __init__(self, top_k, llm):
+    def __init__(self, top_k, llm, embed_model):
         """
         Initialize the VectorStoreManager.
         """
@@ -19,8 +18,9 @@ class VectorStoreManager:
         self.collection_name = "test"  # Default collection name
         self.similarity_top_k = top_k
         self.llm = llm
+        self.embed_model = embed_model
 
-    def create_vector_store(self, md_contents, meta_data, api_key, api_base):
+    def create_vector_store(self, md_contents, meta_data):
         """
         Add markdown content and metadata to the index.
         """
@@ -40,17 +40,12 @@ class VectorStoreManager:
         db = chromadb.PersistentClient(path=self.chroma_db_path)
         chroma_collection = db.get_or_create_collection(self.collection_name)
 
-        # Define embedding model
-        embed_model = OpenAIEmbedding(
-            model_name="text-embedding-3-large",
-            api_key=api_key,
-            api_base=api_base,
-        )
-
         # Initialize semantic chunker (SimpleNodeParser)
         logger.debug("Initializing semantic chunker (SimpleNodeParser).")
         splitter = SemanticSplitterNodeParser(
-            buffer_size=1, breakpoint_percentile_threshold=95, embed_model=embed_model
+            buffer_size=1,
+            breakpoint_percentile_threshold=95,
+            embed_model=self.embed_model,
         )
         base_splitter = SentenceSplitter(chunk_size=1024)
 
@@ -87,10 +82,10 @@ class VectorStoreManager:
         vector_store = ChromaVectorStore(chroma_collection=chroma_collection)
         storage_context = StorageContext.from_defaults(vector_store=vector_store)
         index = VectorStoreIndex(
-            all_nodes, storage_context=storage_context, embed_model=embed_model
+            all_nodes, storage_context=storage_context, embed_model=self.embed_model
         )
         retriever = VectorIndexRetriever(
-            index=index, similarity_top_k=self.similarity_top_k, embed_model=embed_model
+            index=index, similarity_top_k=self.similarity_top_k, embed_model=self.embed_model
         )
 
         response_synthesizer = get_response_synthesizer(llm=self.llm)

@@ -1,6 +1,5 @@
-from llama_index.llms.openai_like import OpenAILike
-
 from papairus.doc_meta_info import DocItem
+from papairus.llm_provider import build_llm
 from papairus.log import logger
 from papairus.prompt import chat_template
 from papairus.settings import SettingsManager
@@ -14,15 +13,7 @@ class ChatEngine:
     def __init__(self, project_manager):
         setting = SettingsManager.get_setting()
 
-        self.llm = OpenAILike(
-            api_key=setting.chat_completion.openai_api_key.get_secret_value(),
-            api_base=setting.chat_completion.openai_base_url,
-            timeout=setting.chat_completion.request_timeout,
-            model=setting.chat_completion.model,
-            temperature=setting.chat_completion.temperature,
-            max_retries=1,
-            is_chat_model=True,
-        )
+        self.llm = build_llm(setting.chat_completion)
 
     def build_prompt(self, doc_item: DocItem):
         """Builds and returns the system and user prompts based on the DocItem."""

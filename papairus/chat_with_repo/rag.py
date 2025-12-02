@@ -1,7 +1,5 @@
 import json
 
-from llama_index.llms.openai import OpenAI
-
 from papairus.chat_with_repo.json_handler import JsonFileProcessor
 from papairus.chat_with_repo.prompt import (
     query_generation_template,
@@ -11,27 +9,23 @@ from papairus.chat_with_repo.prompt import (
 )
 from papairus.chat_with_repo.text_analysis_tool import TextAnalysisTool
 from papairus.chat_with_repo.vector_store_manager import VectorStoreManager
+from papairus.llm_provider import build_embedding_model, build_llm
 from papairus.log import logger
 
 
 class RepoAssistant:
-    def __init__(self, api_key, api_base, db_path):
+    def __init__(self, chat_settings, db_path):
         self.db_path = db_path
         self.md_contents = []
 
-        self.weak_model = OpenAI(
-            api_key=api_key,
-            api_base=api_base,
-            model="gpt-4o-mini",
-        )
-        self.strong_model = OpenAI(
-            api_key=api_key,
-            api_base=api_base,
-            model="gpt-4o",
-        )
+        self.weak_model = build_llm(chat_settings)
+        self.strong_model = build_llm(chat_settings)
         self.textanslys = TextAnalysisTool(self.weak_model, db_path)
         self.json_data = JsonFileProcessor(db_path)
-        self.vector_store_manager = VectorStoreManager(top_k=5, llm=self.weak_model)
+        embed_model = build_embedding_model(chat_settings)
+        self.vector_store_manager = VectorStoreManager(
+            top_k=5, llm=self.weak_model, embed_model=embed_model
+        )
 
     def generate_queries(self, query_str: str, num_queries: int = 4):
         fmt_prompt = query_generation_template.format(num_queries=num_queries - 1, query=query_str)

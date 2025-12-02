@@ -19,7 +19,7 @@ from papairus.settings import (
 
 @pytest.fixture(autouse=True)
 def reset_settings(monkeypatch):
-    monkeypatch.setenv("OPENAI_API_KEY", "test-key")
+    monkeypatch.setenv("GEMINI_API_KEY", "test-key")
     SettingsManager._setting_instance = None
     yield
     SettingsManager._setting_instance = None
