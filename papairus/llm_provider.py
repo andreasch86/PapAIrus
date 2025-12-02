@@ -16,6 +16,11 @@ except ImportError:  # pragma: no cover - optional dependency
     Gemini = None  # type: ignore
 
 try:  # pragma: no cover - optional dependency
+    from google.oauth2.service_account import Credentials as SACredentials
+except ImportError:  # pragma: no cover - optional dependency
+    SACredentials = None  # type: ignore
+
+try:  # pragma: no cover - optional dependency
     from llama_index.llms.ollama import Ollama
 except ImportError:  # pragma: no cover - optional dependency
     Ollama = None  # type: ignore
@@ -35,6 +40,19 @@ def build_llm(chat_settings: ChatCompletionSettings):
     """Return a configured LLM implementation for the given settings."""
     if chat_settings.model == "gemini-3-flash":
         gemini_cls = _require_dependency(Gemini, "llama-index-llms-gemini")
+        if chat_settings.gemini_credentials_file is not None:
+            credentials_cls = _require_dependency(SACredentials, "google-auth")
+            credentials = credentials_cls.from_service_account_file(
+                chat_settings.gemini_credentials_file
+            )
+            return Gemini(
+                credentials=credentials,
+                timeout=chat_settings.request_timeout,
+                model=chat_settings.model,
+                temperature=chat_settings.temperature,
+                max_output_tokens=None,
+            )
+
         return Gemini(
             api_key=chat_settings.gemini_api_key.get_secret_value(),  # type: ignore[union-attr]
             timeout=chat_settings.request_timeout,

@@ -6,6 +6,7 @@ from iso639 import Language, LanguageNotFoundError
 from pydantic import (
     DirectoryPath,
     Field,
+    FilePath,
     HttpUrl,
     PositiveFloat,
     PositiveInt,
@@ -65,6 +66,13 @@ class ChatCompletionSettings(BaseSettings):
     request_timeout: PositiveInt = 60
     gemini_base_url: str = "https://generativelanguage.googleapis.com/v1beta"
     gemini_api_key: Optional[SecretStr] = Field(None, exclude=True)
+    gemini_credentials_file: Optional[FilePath] = Field(
+        None,
+        description=(
+            "Path to a Google service account JSON file. "
+            "Required when using Gemini 3 with OAuth credentials."
+        ),
+    )
     ollama_base_url: str = "http://localhost:11434"
     ollama_model: str = "gemma2:latest"
     ollama_embedding_model: str = "nomic-embed-text"
@@ -93,8 +101,11 @@ class ChatCompletionSettings(BaseSettings):
     @classmethod
     def validate_api_key(cls, value: Optional[SecretStr], info):
         model = info.data.get("model")
-        if model == "gemini-3-flash" and value is None:
-            raise ValueError("gemini_api_key is required when using Gemini models")
+        credentials_file = info.data.get("gemini_credentials_file")
+        if model == "gemini-3-flash" and value is None and credentials_file is None:
+            raise ValueError(
+                "Either gemini_api_key or gemini_credentials_file is required when using Gemini models"
+            )
         return value
 
 
@@ -126,6 +137,7 @@ class SettingsManager:
         temperature: float,
         request_timeout: int,
         gemini_base_url: str,
+        gemini_credentials_file: Path | None,
         telemetry_opt_in: bool,
     ):
         project_settings = ProjectSettings(
@@ -144,6 +156,7 @@ class SettingsManager:
             temperature=temperature,
             request_timeout=request_timeout,
             gemini_base_url=gemini_base_url,
+            gemini_credentials_file=gemini_credentials_file,
         )
 
         cls._setting_instance = Setting(

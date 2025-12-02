@@ -1,4 +1,5 @@
 from importlib import metadata
+from pathlib import Path
 
 import click
 import git
@@ -74,6 +75,17 @@ def handle_setting_error(e: ValidationError):
     show_default=True,
     help="The base URL for Gemini API calls.",
     type=str,
+)
+@click.option(
+    "--gemini-credentials-file",
+    "-gcf",
+    default=None,
+    show_default=True,
+    help=(
+        "Path to a Google Cloud service account JSON file. "
+        "If provided, PapAIrus will use OAuth credentials instead of an API key for Gemini."
+    ),
+    type=click.Path(dir_okay=False, exists=True, path_type=Path),
 )
 @click.option(
     "--target-repo-path",
@@ -157,6 +169,7 @@ def run(
     temperature,
     request_timeout,
     base_url,
+    gemini_credentials_file,
     target_repo_path,
     hierarchy_path,
     markdown_docs_path,
@@ -214,6 +227,7 @@ def run(
             temperature=temperature,
             request_timeout=request_timeout,
             gemini_base_url=base_url,
+            gemini_credentials_file=gemini_credentials_file,
             telemetry_opt_in=telemetry,
             max_thread_count=max_thread_count,
         )
