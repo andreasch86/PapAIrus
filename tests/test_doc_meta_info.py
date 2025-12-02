@@ -2,6 +2,7 @@ from papairus.doc_meta_info import (
     DocItem,
     DocItemStatus,
     DocItemType,
+    find_all_referencer,
     need_to_generate,
 )
 
@@ -41,3 +42,21 @@ def test_tree_helpers_compute_depth_and_paths():
     travel = root.get_travel_list()
     assert root in travel and function in travel
     assert DocItem.has_ans_relation(file_item, function) == file_item
+
+
+def test_find_all_referencer_clamps_column_on_blank_line(tmp_path):
+    repo = tmp_path
+    file_path = repo / "module.py"
+    # Second line is blank to trigger a zero-length column range.
+    file_path.write_text("def foo():\n\n    return 1\n")
+
+    results = find_all_referencer(
+        repo_path=str(repo),
+        variable_name="foo",
+        file_path="module.py",
+        line_number=2,
+        column_number=10,
+    )
+
+    # No references should be found, but the call should succeed without errors.
+    assert results == []
