@@ -292,9 +292,9 @@ def chat_with_repo():
         handle_setting_error(e)
         return
 
-    from papairus.chat_with_repo import main
+    from papairus.chat_with_repo.main import main as chat_main
 
-    main()
+    chat_main()
 
 
 if __name__ == "__main__":  # pragma: no cover
