@@ -68,7 +68,7 @@ def test_build_llm_uses_gemini(monkeypatch):
     monkeypatch.setattr("papairus.llm_provider.Gemini", FakeGemini)
 
     settings = ChatCompletionSettings(
-        model="gemini-3.5-flash",
+        model="gemini-3-flash",
         gemini_api_key="dummy-key",
         request_timeout=30,
         temperature=0.2,
@@ -78,5 +78,5 @@ def test_build_llm_uses_gemini(monkeypatch):
 
     assert isinstance(llm, FakeGemini)
     assert captured_kwargs["api_key"] == "dummy-key"
-    assert captured_kwargs["model"] == "gemini-3.5-flash"
+    assert captured_kwargs["model"] == "gemini-3-flash"
     assert captured_kwargs["timeout"] == 30

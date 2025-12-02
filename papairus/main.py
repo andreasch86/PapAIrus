@@ -45,9 +45,9 @@ def handle_setting_error(e: ValidationError):
 @click.option(
     "--model",
     "-m",
-    default="gemini-3.5-flash",
+    default="gemini-3-flash",
     show_default=True,
-    help="Specifies the model to use for completion (gemma-local or gemini-3.5-flash).",
+    help="Specifies the model to use for completion (gemma-local or gemini-3-flash).",
     type=str,
 )
 @click.option(

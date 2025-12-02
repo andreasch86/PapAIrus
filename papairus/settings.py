@@ -60,7 +60,7 @@ class ProjectSettings(BaseSettings):
 
 
 class ChatCompletionSettings(BaseSettings):
-    model: str = "gemini-3.5-flash"  # Only Gemini (API) or local Gemma are allowed.
+    model: str = "gemini-3-flash"  # Only Gemini (API) or local Gemma are allowed.
     temperature: PositiveFloat = 0.2
     request_timeout: PositiveInt = 60
     gemini_base_url: str = "https://generativelanguage.googleapis.com/v1beta"
@@ -82,10 +82,10 @@ class ChatCompletionSettings(BaseSettings):
     @field_validator("model")
     @classmethod
     def validate_model(cls, value: str) -> str:
-        allowed_models = {"gemini-3.5-flash", "gemma-local"}
+        allowed_models = {"gemini-3-flash", "gemma-local"}
         if value not in allowed_models:
             raise ValueError(
-                "Model must be one of: gemma-local (self-hosted) or gemini-3.5-flash (API)."
+                "Model must be one of: gemma-local (self-hosted) or gemini-3-flash (API)."
             )
         return value
 
@@ -93,7 +93,7 @@ class ChatCompletionSettings(BaseSettings):
     @classmethod
     def validate_api_key(cls, value: Optional[SecretStr], info):
         model = info.data.get("model")
-        if model == "gemini-3.5-flash" and value is None:
+        if model == "gemini-3-flash" and value is None:
             raise ValueError("gemini_api_key is required when using Gemini models")
         return value
 

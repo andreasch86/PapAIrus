@@ -57,6 +57,6 @@ if __name__ == "__main__":
 
     api_key = "your_api_key"
     log_file = "your_logfile_path"
-    llm = Gemini(api_key=api_key, model="gemini-3.5-flash")
+    llm = Gemini(api_key=api_key, model="gemini-3-flash")
     db_path = "your_database_path"
     test = TextAnalysisTool(llm, db_path)

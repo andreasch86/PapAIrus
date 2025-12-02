@@ -1,6 +1,6 @@
 # PapAIrus
 
-PapAIrus (`papairus`) is a corporate adaptation of the upstream [OpenBMB/RepoAgent](https://github.com/OpenBMB/RepoAgent), maintained by the AI Platform team and tailored by Andrea Scholtz for internal documentation workflows. The project enforces UK English output, Google-style docstrings, and a constrained model set (local Gemma or Google Gemini 3.5, Flash when available) to keep behaviour predictable and reviewable.
+PapAIrus (`papairus`) is a corporate adaptation of the upstream [OpenBMB/RepoAgent](https://github.com/OpenBMB/RepoAgent), maintained by the AI Platform team and tailored by Andrea Scholtz for internal documentation workflows. The project enforces UK English output, Google-style docstrings, and a constrained model set (local Gemma or Google Gemini 3, Flash when available) to keep behaviour predictable and reviewable.
 
 ## Key capabilities
 - Automatic repository analysis and documentation generation across Python, Go, Rust, C++, Java, and SQL projects.
@@ -34,7 +34,7 @@ Run from the target repository root (or pass `--target-repo-path`):
 ```bash
 # Gemini cloud generation
 export GEMINI_API_KEY=your_gemini_key
-papairus run --model gemini-3.5-flash --allow-main --telemetry
+papairus run --model gemini-3-flash --allow-main --telemetry
 
 # Local Gemma via Ollama
 papairus run --model gemma-local --base-url http://localhost:11434 --dry-run

@@ -33,7 +33,7 @@ def _require_dependency(dep, name: str):
 
 def build_llm(chat_settings: ChatCompletionSettings):
     """Return a configured LLM implementation for the given settings."""
-    if chat_settings.model == "gemini-3.5-flash":
+    if chat_settings.model == "gemini-3-flash":
         gemini_cls = _require_dependency(Gemini, "llama-index-llms-gemini")
         return Gemini(
             api_key=chat_settings.gemini_api_key.get_secret_value(),  # type: ignore[union-attr]
@@ -57,7 +57,7 @@ def build_llm(chat_settings: ChatCompletionSettings):
 
 def build_embedding_model(chat_settings: ChatCompletionSettings):
     """Return an embedding model implementation aligned with the chat settings."""
-    if chat_settings.model == "gemini-3.5-flash":
+    if chat_settings.model == "gemini-3-flash":
         gemini_embedding_cls = _require_dependency(
             GeminiEmbedding, "llama-index-embeddings-gemini"
         )
