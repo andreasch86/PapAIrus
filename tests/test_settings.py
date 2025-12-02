@@ -14,6 +14,11 @@ def test_language_validation_accepts_iso_code():
     assert settings.language == "English (UK)"
 
 
+def test_language_validation_accepts_mixed_case_code():
+    settings = ProjectSettings(target_repo=".", language="En")
+    assert settings.language == "English (UK)"
+
+
 def test_language_validation_rejects_other_languages():
     with pytest.raises(ValidationError):
         ProjectSettings(target_repo=".", language="French")
