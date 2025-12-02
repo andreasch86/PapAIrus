@@ -87,7 +87,6 @@ def test_settings_manager_initialize_with_params_sets_instance(tmp_path):
         temperature=0.3,
         request_timeout=30,
         gemini_base_url="https://example.com",
-        gemini_credentials_file=None,
         telemetry_opt_in=True,
     )
     setting = SettingsManager.get_setting()
