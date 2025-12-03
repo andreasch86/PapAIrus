@@ -24,7 +24,7 @@ uv pip install -e .[chat_with_repo]
 PapAIrus exposes the `papairus` command for documentation generation and an interactive chat UI for RAG-style question answering.
 
 ### Model configuration (Gemini vs. Gemma/Ollama)
-- **Gemini API**: set `GEMINI_API_KEY` and optionally override `--base-url`.
+- **Gemini API**: set `GEMINI_API_KEY` for Gemini 3; optionally override `--base-url` (defaults to Vertex AI: `https://aiplatform.googleapis.com/v1`).
 - **Gemma via Ollama**: set `--model gemma-local` and point to your Ollama deployment with `OLLAMA_BASE_URL`/`--base-url` (defaults to `http://localhost:11434`). Gemini keys are not required for local Gemma.
 - Embeddings follow the same provider as the model: Gemini embeddings for cloud, or `ollama_embedding_model` for local usage.
 
@@ -34,7 +34,8 @@ Run from the target repository root (or pass `--target-repo-path`):
 ```bash
 # Gemini cloud generation
 export GEMINI_API_KEY=your_gemini_key
-papairus run --model gemini-3-flash --allow-main --telemetry
+
+papairus run --model gemini-2.5-flash --allow-main --telemetry
 
 # Local Gemma via Ollama
 papairus run --model gemma-local --base-url http://localhost:11434 --dry-run

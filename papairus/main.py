@@ -1,4 +1,6 @@
-from importlib import metadata
+from importlib import import_module, metadata
+from pathlib import Path
+import sys
 
 import click
 import git
@@ -46,9 +48,9 @@ def handle_setting_error(e: ValidationError):
 @click.option(
     "--model",
     "-m",
-    default="gemini-3-flash",
+    default="gemini-2.5-flash",
     show_default=True,
-    help="Specifies the model to use for completion (gemma-local or gemini-3-flash).",
+    help="Specifies the model to use for completion (gemma-local or any Gemini model starting with 'gemini-').",
     type=str,
 )
 @click.option(
@@ -70,7 +72,7 @@ def handle_setting_error(e: ValidationError):
 @click.option(
     "--base-url",
     "-b",
-    default="https://generativelanguage.googleapis.com/v1beta",
+    default="https://aiplatform.googleapis.com/v1",
     show_default=True,
     help="The base URL for Gemini API calls.",
     type=str,
@@ -291,9 +293,21 @@ def chat_with_repo():
         handle_setting_error(e)
         return
 
-    from papairus.chat_with_repo import main
+    chat_module = sys.modules.get("papairus.chat_with_repo") or sys.modules.get(
+        "papairus.chat_with_repo.main"
+    )
 
-    main()
+    if chat_module is None:
+        try:
+            chat_module = import_module("papairus.chat_with_repo.main")
+        except ModuleNotFoundError:
+            chat_module = import_module("papairus.chat_with_repo")
+
+    chat_main = getattr(chat_module, "main", None)
+    if not callable(chat_main):  # pragma: no cover - defensive guard
+        raise click.ClickException("papairus.chat_with_repo.main is not callable")
+
+    chat_main()
 
 
 if __name__ == "__main__":  # pragma: no cover

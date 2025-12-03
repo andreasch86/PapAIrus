@@ -53,10 +53,16 @@ The output function name or class name should be only one.
 
 
 if __name__ == "__main__":
-    from llama_index.llms.gemini import Gemini
+    from papairus.llm_provider import VertexGeminiLLM
 
     api_key = "your_api_key"
     log_file = "your_logfile_path"
-    llm = Gemini(api_key=api_key, model="gemini-3-flash")
+    llm = VertexGeminiLLM(
+        api_key=api_key,
+        base_url="https://aiplatform.googleapis.com/v1",
+        model="gemini-2.5-flash",
+        temperature=0.2,
+        timeout=60,
+    )
     db_path = "your_database_path"
     test = TextAnalysisTool(llm, db_path)

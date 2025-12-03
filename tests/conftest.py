@@ -2,8 +2,12 @@ import os
 import sys
 from pathlib import Path
 
-import git
 import pytest
+
+try:
+    import git
+except ImportError:  # pragma: no cover - optional dependency for a subset of tests
+    git = None
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(PROJECT_ROOT))
@@ -27,6 +31,8 @@ def reset_settings(monkeypatch):
 
 @pytest.fixture()
 def temp_repo(tmp_path, monkeypatch):
+    if git is None:
+        pytest.skip("GitPython is required for repository-backed tests")
     repo_path = tmp_path / "repo"
     repo_path.mkdir()
     repo = git.Repo.init(repo_path)

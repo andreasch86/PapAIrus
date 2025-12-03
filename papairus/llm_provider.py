@@ -11,14 +11,14 @@ except ImportError:  # pragma: no cover - optional dependency
     OllamaEmbedding = None  # type: ignore
 
 try:  # pragma: no cover - optional dependency
-    from llama_index.llms.gemini import Gemini
-except ImportError:  # pragma: no cover - optional dependency
-    Gemini = None  # type: ignore
-
-try:  # pragma: no cover - optional dependency
     from llama_index.llms.ollama import Ollama
 except ImportError:  # pragma: no cover - optional dependency
     Ollama = None  # type: ignore
+
+from types import SimpleNamespace
+
+import requests
+from requests import HTTPError
 
 from papairus.settings import ChatCompletionSettings
 
@@ -31,16 +31,100 @@ def _require_dependency(dep, name: str):
     return dep
 
 
+class VertexGeminiLLM:
+    """Minimal Vertex Gemini chat client using an API key."""
+
+    def __init__(
+        self,
+        api_key: str,
+        base_url: str,
+        model: str,
+        temperature: float,
+        timeout: int,
+    ) -> None:
+        self.api_key = api_key
+        self.model = model
+        self.temperature = temperature
+        self.base_url = base_url.rstrip("/")
+        self.timeout = timeout
+
+    def chat(self, messages):
+        # Flatten system/user messages into a single prompt string to align with
+        # Vertex AI's content payload.
+        prompt_parts: list[str] = []
+        for message in messages:
+            prompt_parts.append(str(message.content))
+
+        payload = {
+            "contents": [
+                {
+                    "role": "user",
+                    "parts": [{"text": "\n\n".join(prompt_parts)}],
+                }
+            ],
+            "generationConfig": {
+                "temperature": self.temperature,
+            },
+        }
+
+        endpoint = f"{self.base_url}/publishers/google/models/{self.model}:generateContent"
+        response = requests.post(
+            endpoint,
+            params={"key": self.api_key},
+            json=payload,
+            timeout=self.timeout,
+        )
+        try:
+            response.raise_for_status()
+        except HTTPError as exc:  # pragma: no cover - error path exercised in tests
+            status_code = getattr(exc.response, "status_code", None)
+            if status_code == 404:
+                raise ValueError(
+                    "Gemini model not found. Confirm the model name (e.g., "
+                    "gemini-2.0-flash, gemini-2.5-flash, gemini-1.5-pro-latest) "
+                    "and that it is available for API-key access. "
+                    f"Endpoint: {endpoint}"
+                ) from exc
+
+            raise
+        data = response.json()
+        candidates = data.get("candidates", [])
+        if not candidates:
+            raise RuntimeError("No candidates returned from Gemini API")
+
+        content = candidates[0].get("content", {})
+        parts = content.get("parts", [])
+        text_chunks = [part.get("text", "") for part in parts]
+        text = "".join(text_chunks)
+
+        message = SimpleNamespace(content=text)
+        usage = data.get("usage_metadata", {})
+        raw_usage = SimpleNamespace(
+            prompt_tokens=usage.get("prompt_token_count", 0),
+            completion_tokens=usage.get("candidates_token_count", 0),
+            total_tokens=usage.get("total_token_count", 0),
+        )
+
+        # Mirror the llama-index ChatResponse shape expected by ChatEngine.
+        return SimpleNamespace(
+            message=message,
+            raw=SimpleNamespace(usage=raw_usage),
+        )
+
+
 def build_llm(chat_settings: ChatCompletionSettings):
     """Return a configured LLM implementation for the given settings."""
-    if chat_settings.model == "gemini-3-flash":
-        gemini_cls = _require_dependency(Gemini, "llama-index-llms-gemini")
-        return Gemini(
-            api_key=chat_settings.gemini_api_key.get_secret_value(),  # type: ignore[union-attr]
-            timeout=chat_settings.request_timeout,
+    if chat_settings.model.startswith("gemini-"):
+        api_key = chat_settings.gemini_api_key
+        if api_key is None:
+            raise ValueError("gemini_api_key must be provided for Gemini models")
+
+        return VertexGeminiLLM(
+            api_key=api_key.get_secret_value(),  # type: ignore[union-attr]
+            base_url=chat_settings.gemini_base_url,
             model=chat_settings.model,
             temperature=chat_settings.temperature,
-            max_output_tokens=None,
+            timeout=chat_settings.request_timeout,
         )
 
     if chat_settings.model == "gemma-local":
@@ -57,7 +141,7 @@ def build_llm(chat_settings: ChatCompletionSettings):
 
 def build_embedding_model(chat_settings: ChatCompletionSettings):
     """Return an embedding model implementation aligned with the chat settings."""
-    if chat_settings.model == "gemini-3-flash":
+    if chat_settings.model.startswith("gemini-"):
         gemini_embedding_cls = _require_dependency(
             GeminiEmbedding, "llama-index-embeddings-gemini"
         )
@@ -67,9 +151,16 @@ def build_embedding_model(chat_settings: ChatCompletionSettings):
         )
 
     if chat_settings.model == "gemma-local":
-        ollama_embedding_cls = _require_dependency(
-            OllamaEmbedding, "llama-index-embeddings-ollama"
-        )
+        try:
+            ollama_embedding_cls = _require_dependency(
+                OllamaEmbedding, "llama-index-embeddings-ollama"
+            )
+        except ImportError as exc:  # pragma: no cover - defensive runtime message
+            raise ImportError(
+                "llama-index-embeddings-ollama is required for chat-with-repo. "
+                "Install it with `pip install \"llama-index-embeddings-ollama>=0.3.0\"`."
+            ) from exc
+
         return ollama_embedding_cls(
             model_name=chat_settings.ollama_embedding_model,
             base_url=chat_settings.ollama_base_url,

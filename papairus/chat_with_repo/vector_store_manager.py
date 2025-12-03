@@ -8,6 +8,25 @@ from llama_index.vector_stores.chroma import ChromaVectorStore
 from papairus.log import logger
 
 
+def _extract_doc_text(doc: Document) -> str:
+    """Return the document text without raising attribute errors."""
+
+    # Primary path: the `text` attribute is standard on llama-index Documents.
+    text_value = getattr(doc, "text", None)
+    if text_value:
+        return text_value
+
+    # Fallback: if a helper exists, call it defensively.
+    get_text = getattr(doc, "get_text", None)
+    if callable(get_text):
+        try:
+            return get_text() or ""
+        except Exception:
+            return ""
+
+    return ""
+
+
 class VectorStoreManager:
     def __init__(self, top_k, llm, embed_model):
         """
@@ -55,7 +74,10 @@ class VectorStoreManager:
 
         all_nodes = []
         for i, doc in enumerate(documents):
-            logger.debug(f"Processing document {i+1}: Content length={len(doc.get_text())}")
+            text_content = _extract_doc_text(doc)
+            logger.debug(
+                f"Processing document {i+1}: Content length={len(text_content)}"
+            )
 
             try:
                 # Try semantic splitting first

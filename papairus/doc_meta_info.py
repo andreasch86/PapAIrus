@@ -295,12 +295,34 @@ def find_all_referencer(
     repo_path, variable_name, file_path, line_number, column_number, in_file_only=False
 ):
     """English"""
-    script = jedi.Script(path=os.path.join(repo_path, file_path))
+    abs_path = os.path.join(repo_path, file_path)
+    try:
+        lines = Path(abs_path).read_text().splitlines(True)
+    except FileNotFoundError:
+        logger.error(
+            f"File not found when searching references: {abs_path}"  # noqa: G004
+        )
+        return []
+
+    if line_number < 1 or line_number > len(lines):
+        logger.error(
+            f"Line number {line_number} is out of range for {abs_path} (total {len(lines)})"
+        )
+        return []
+
+    # jedi requires the column to be within the line length; clamp to the nearest valid range.
+    target_line = lines[line_number - 1]
+    max_column = max(len(target_line) - 1, 0)
+    safe_column = max(0, min(column_number, max_column))
+
+    script = jedi.Script(path=abs_path)
     try:
         if in_file_only:
-            references = script.get_references(line=line_number, column=column_number, scope="file")
+            references = script.get_references(
+                line=line_number, column=safe_column, scope="file"
+            )
         else:
-            references = script.get_references(line=line_number, column=column_number)
+            references = script.get_references(line=line_number, column=safe_column)
         # English variable_name English，English
         variable_references = [ref for ref in references if ref.name == variable_name]
         # if variable_name == "need_to_generate":

@@ -40,12 +40,17 @@ class ProjectSettings(BaseSettings):
         if "english" in normalized:
             return "English (UK)"
         try:
-            language_name = Language.match(v).name
+            language = Language.match(v)
         except LanguageNotFoundError:
-            raise ValueError(
-                "Invalid language input. Please enter a valid ISO 639 code or language name."
-            )
-        if language_name.lower() != "english":
+            language = None
+
+        if language is None or language.name.lower() != "english":
+            try:
+                language = Language.match(normalized)
+            except LanguageNotFoundError:
+                language = None
+
+        if language is None or language.name.lower() != "english":
             raise ValueError("PapAIrus only supports UK English output.")
         return "English (UK)"
 
@@ -60,10 +65,10 @@ class ProjectSettings(BaseSettings):
 
 
 class ChatCompletionSettings(BaseSettings):
-    model: str = "gemini-3-flash"  # Only Gemini (API) or local Gemma are allowed.
+    model: str = "gemini-2.5-flash"  # Gemini (API key) or local Gemma are allowed.
     temperature: PositiveFloat = 0.2
     request_timeout: PositiveInt = 60
-    gemini_base_url: str = "https://generativelanguage.googleapis.com/v1beta"
+    gemini_base_url: str = "https://aiplatform.googleapis.com/v1"
     gemini_api_key: Optional[SecretStr] = Field(None, exclude=True)
     ollama_base_url: str = "http://localhost:11434"
     ollama_model: str = "gemma2:latest"
@@ -82,18 +87,20 @@ class ChatCompletionSettings(BaseSettings):
     @field_validator("model")
     @classmethod
     def validate_model(cls, value: str) -> str:
-        allowed_models = {"gemini-3-flash", "gemma-local"}
-        if value not in allowed_models:
-            raise ValueError(
-                "Model must be one of: gemma-local (self-hosted) or gemini-3-flash (API)."
-            )
+        if value.startswith("gemini-"):
+            return value
+        if value == "gemma-local":
+            return value
+        raise ValueError(
+            "Model must be gemma-local (self-hosted) or a Gemini model name starting with 'gemini-'."
+        )
         return value
 
     @field_validator("gemini_api_key")
     @classmethod
     def validate_api_key(cls, value: Optional[SecretStr], info):
         model = info.data.get("model")
-        if model == "gemini-3-flash" and value is None:
+        if isinstance(model, str) and model.startswith("gemini-") and value is None:
             raise ValueError("gemini_api_key is required when using Gemini models")
         return value
 
