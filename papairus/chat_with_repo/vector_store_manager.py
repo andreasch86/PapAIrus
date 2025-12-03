@@ -1,4 +1,5 @@
 import chromadb
+import requests
 from llama_index.core import Document, StorageContext, VectorStoreIndex, get_response_synthesizer
 from llama_index.core.node_parser import SemanticSplitterNodeParser, SentenceSplitter
 from llama_index.core.query_engine import RetrieverQueryEngine
@@ -49,10 +50,41 @@ def _raise_embedding_model_error(exc: Exception, embed_model) -> None:
         raise MissingEmbeddingModelError(details) from exc
 
 
+def _list_ollama_models(base_url: str | None) -> list[str] | None:
+    """Return available Ollama model names or None if the endpoint is unreachable."""
+
+    if not base_url:
+        return None
+
+    try:
+        response = requests.get(f"{base_url}/api/tags", timeout=5)
+        response.raise_for_status()
+    except Exception:
+        return None
+
+    payload = response.json()
+    models = payload.get("models", []) if isinstance(payload, dict) else []
+    return [entry.get("name") for entry in models if isinstance(entry, dict)]
+
+
 def _ensure_embedding_model_available(embed_model) -> None:
     """Validate the configured embedding model is pullable before indexing."""
 
     try:
+        model_name = getattr(embed_model, "model_name", None) or getattr(
+            embed_model, "model", "nomic-embed-text"
+        )
+        base_url = getattr(embed_model, "base_url", None)
+
+        available_models = _list_ollama_models(base_url)
+        if available_models is not None and model_name not in available_models:
+            raise MissingEmbeddingModelError(
+                "Ollama embedding model '{model}' is not available at {url}. "
+                "Run `ollama pull {model}` and retry chat-with-repo.".format(
+                    model=model_name, url=base_url
+                )
+            )
+
         if hasattr(embed_model, "get_text_embedding"):
             embed_model.get_text_embedding("__healthcheck__")
         elif hasattr(embed_model, "get_text_embedding_batch"):

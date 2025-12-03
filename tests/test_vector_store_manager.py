@@ -149,6 +149,10 @@ def patched_manager(monkeypatch):
         "papairus.chat_with_repo.vector_store_manager.RetrieverQueryEngine",
         DummyQueryEngine,
     )
+    monkeypatch.setattr(
+        "papairus.chat_with_repo.vector_store_manager._list_ollama_models",
+        lambda _base_url: None,
+    )
     manager = VectorStoreManager(top_k=1, llm="llm", embed_model=DummyEmbedModel())
     return manager
 
@@ -389,5 +393,44 @@ def test_preflight_reraises_non_embedding_errors():
 
     with pytest.raises(RuntimeError):
         _ensure_embedding_model_available(ExplodingBatchEmbed())
+
+
+def test_ollama_tag_listing_success(monkeypatch):
+    from papairus.chat_with_repo.vector_store_manager import _list_ollama_models
+
+    class FakeResponse:
+        def __init__(self):
+            self.status_code = 200
+
+        def raise_for_status(self):
+            return None
+
+        def json(self):
+            return {"models": [{"name": "a"}, {"name": "b"}]}
+
+    monkeypatch.setattr(
+        "papairus.chat_with_repo.vector_store_manager.requests.get",
+        lambda *_args, **_kwargs: FakeResponse(),
+    )
+
+    assert _list_ollama_models("http://localhost:11434") == ["a", "b"]
+
+
+def test_preflight_raises_when_tags_show_missing(monkeypatch):
+    from papairus.chat_with_repo.vector_store_manager import (
+        _ensure_embedding_model_available,
+    )
+
+    monkeypatch.setattr(
+        "papairus.chat_with_repo.vector_store_manager._list_ollama_models",
+        lambda _base_url: ["other-embed"],
+    )
+
+    embed_model = DummyEmbedModel(model_name="missing", base_url="http://localhost:11434")
+
+    with pytest.raises(MissingEmbeddingModelError) as excinfo:
+        _ensure_embedding_model_available(embed_model)
+
+    assert "missing" in str(excinfo.value)
 
 
