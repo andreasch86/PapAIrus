@@ -49,6 +49,19 @@ def _raise_embedding_model_error(exc: Exception, embed_model) -> None:
         raise MissingEmbeddingModelError(details) from exc
 
 
+def _ensure_embedding_model_available(embed_model) -> None:
+    """Validate the configured embedding model is pullable before indexing."""
+
+    try:
+        if hasattr(embed_model, "get_text_embedding"):
+            embed_model.get_text_embedding("__healthcheck__")
+        elif hasattr(embed_model, "get_text_embedding_batch"):
+            embed_model.get_text_embedding_batch(["__healthcheck__"])
+    except Exception as exc:  # noqa: BLE001 - propagate meaningful guidance
+        _raise_embedding_model_error(exc, embed_model)
+        raise
+
+
 class VectorStoreManager:
     def __init__(self, top_k, llm, embed_model):
         """
@@ -76,6 +89,11 @@ class VectorStoreManager:
 
         logger.debug(f"Number of markdown contents: {len(md_contents)}")
         logger.debug(f"Number of metadata entries: {len(meta_data)}")
+
+        # Fail fast if the Ollama embedding model is unavailable, instead of
+        # streaming a series of semantic-splitter fallbacks before the eventual
+        # embed call fails during index construction.
+        _ensure_embedding_model_available(self.embed_model)
 
         # Initialize Chroma client and collection
         db = chromadb.PersistentClient(path=self.chroma_db_path)

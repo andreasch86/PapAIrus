@@ -76,6 +76,24 @@ class DummyQueryEngine:
         return types.SimpleNamespace(response="ok", metadata={})
 
 
+class DummyEmbedModel:
+    def __init__(self, *, model_name="dummy-embed", base_url="http://localhost:11434"):
+        self.model_name = model_name
+        self.base_url = base_url
+
+    def get_text_embedding(self, _text):
+        return [0.1, 0.2]
+
+
+class BatchOnlyEmbedModel:
+    def __init__(self):
+        self.calls = 0
+
+    def get_text_embedding_batch(self, texts):
+        self.calls += 1
+        return [[0.1] * len(texts)]
+
+
 class FakeResponseError(Exception):
     def __init__(self, message="model missing", status_code=404):
         super().__init__(message)
@@ -131,7 +149,7 @@ def patched_manager(monkeypatch):
         "papairus.chat_with_repo.vector_store_manager.RetrieverQueryEngine",
         DummyQueryEngine,
     )
-    manager = VectorStoreManager(top_k=1, llm="llm", embed_model="embed")
+    manager = VectorStoreManager(top_k=1, llm="llm", embed_model=DummyEmbedModel())
     return manager
 
 
@@ -241,9 +259,7 @@ def test_query_store_with_engine(monkeypatch, patched_manager):
 
 
 def test_missing_embedding_model_raises_clear_error(monkeypatch, patched_manager):
-    patched_manager.embed_model = types.SimpleNamespace(
-        model_name="missing-embed", base_url="http://localhost:11434"
-    )
+    patched_manager.embed_model = DummyEmbedModel(model_name="missing-embed")
 
     def failing_index(*_args, **_kwargs):
         raise FakeResponseError("model \"missing-embed\" not found", status_code=404)
@@ -271,7 +287,7 @@ def test_non_embedding_error_is_propagated(monkeypatch, patched_manager):
 
 
 def test_missing_embedding_model_without_base_url(monkeypatch, patched_manager):
-    patched_manager.embed_model = types.SimpleNamespace(model_name="missing-embed")
+    patched_manager.embed_model = DummyEmbedModel(model_name="missing-embed", base_url=None)
 
     def failing_index(*_args, **_kwargs):
         raise FakeResponseError("model \"missing-embed\" not found", status_code=404)
@@ -284,5 +300,94 @@ def test_missing_embedding_model_without_base_url(monkeypatch, patched_manager):
         patched_manager.create_vector_store(["content"], [{"source": "test"}])
 
     assert "pull missing-embed" in str(excinfo.value)
+
+
+def test_preflight_embedding_check_runs_once(monkeypatch, patched_manager):
+    call_count = {"count": 0}
+
+    class FailingEmbedModel(DummyEmbedModel):
+        def get_text_embedding(self, _text):
+            call_count["count"] += 1
+            raise FakeResponseError(
+                "model \"missing-embed\" not found", status_code=404
+            )
+
+    patched_manager.embed_model = FailingEmbedModel(model_name="missing-embed")
+
+    with pytest.raises(MissingEmbeddingModelError):
+        patched_manager.create_vector_store(["content"], [{"source": "test"}])
+
+    # Should short-circuit before any splitter/index calls repeat embed attempts.
+    assert call_count["count"] == 1
+
+
+def test_preflight_batch_embedding_path(monkeypatch):
+    from papairus.chat_with_repo.vector_store_manager import (
+        _ensure_embedding_model_available,
+    )
+
+    embed_model = BatchOnlyEmbedModel()
+
+    _ensure_embedding_model_available(embed_model)
+
+    assert embed_model.calls == 1
+
+
+def test_preflight_skips_when_no_embed_methods():
+    from papairus.chat_with_repo.vector_store_manager import (
+        _ensure_embedding_model_available,
+    )
+
+    class NoopEmbed:
+        pass
+
+    _ensure_embedding_model_available(NoopEmbed())
+
+
+def test_missing_embedding_model_includes_base_url():
+    from papairus.chat_with_repo.vector_store_manager import _raise_embedding_model_error
+
+    embed_model = DummyEmbedModel(model_name="missing-embed", base_url="http://localhost:11434")
+
+    with pytest.raises(MissingEmbeddingModelError) as excinfo:
+        _raise_embedding_model_error(
+            FakeResponseError("model \"missing-embed\" not found", status_code=404),
+            embed_model,
+        )
+
+    assert "http://localhost:11434" in str(excinfo.value)
+
+
+def test_batch_embedding_failure_surfaces_base_url():
+    from papairus.chat_with_repo.vector_store_manager import (
+        _ensure_embedding_model_available,
+    )
+
+    class FailingBatchEmbed(BatchOnlyEmbedModel):
+        model_name = "missing-embed"
+        base_url = "http://localhost:11434"
+
+        def get_text_embedding_batch(self, texts):
+            raise FakeResponseError("model \"missing-embed\" not found", status_code=404)
+
+    with pytest.raises(MissingEmbeddingModelError) as excinfo:
+        _ensure_embedding_model_available(FailingBatchEmbed())
+
+    assert "http://localhost:11434" in str(excinfo.value)
+
+
+def test_preflight_reraises_non_embedding_errors():
+    from papairus.chat_with_repo.vector_store_manager import (
+        _ensure_embedding_model_available,
+    )
+
+    class ExplodingBatchEmbed(BatchOnlyEmbedModel):
+        model_name = "unexpected"
+
+        def get_text_embedding_batch(self, texts):
+            raise RuntimeError("boom")
+
+    with pytest.raises(RuntimeError):
+        _ensure_embedding_model_available(ExplodingBatchEmbed())
 
 
