@@ -55,7 +55,10 @@ class VectorStoreManager:
 
         all_nodes = []
         for i, doc in enumerate(documents):
-            logger.debug(f"Processing document {i+1}: Content length={len(doc.get_text())}")
+            text_content = getattr(doc, "text", "") or ""
+            logger.debug(
+                f"Processing document {i+1}: Content length={len(text_content)}"
+            )
 
             try:
                 # Try semantic splitting first

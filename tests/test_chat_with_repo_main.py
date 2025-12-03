@@ -1,5 +1,9 @@
 import types
 
+import pytest
+
+pytest.importorskip("gradio")
+
 from papairus.chat_with_repo import main as chat_main
 from papairus.settings import (
     ChatCompletionSettings,
