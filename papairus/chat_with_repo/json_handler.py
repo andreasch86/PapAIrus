@@ -86,6 +86,6 @@ class JsonFileProcessor:
             return f"An error occurred: {e}"
 
 
-if __name__ == "__main__":
+if __name__ == "__main__":  # pragma: no cover - manual smoke test helper
     processor = JsonFileProcessor("database.json")
     md_contents, extracted_contents = processor.extract_data()

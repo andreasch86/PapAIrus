@@ -66,7 +66,6 @@ class VectorStoreManager:
             breakpoint_percentile_threshold=95,
             embed_model=self.embed_model,
         )
-        base_splitter = SentenceSplitter(chunk_size=1024)
 
         documents = [
             Document(text=content, extra_info=meta) for content, meta in zip(md_contents, meta_data)
@@ -89,6 +88,15 @@ class VectorStoreManager:
                 logger.warning(
                     f"Semantic splitting failed for document {i+1}, falling back to SentenceSplitter. Error: {e}"
                 )
+
+                safe_chunk_size = max(1024, len(str(getattr(doc, "extra_info", ""))) + 1)
+                logger.debug(
+                    "Using SentenceSplitter chunk_size=%s for document %s to accommodate metadata of length %s.",
+                    safe_chunk_size,
+                    i + 1,
+                    len(str(getattr(doc, "extra_info", ""))),
+                )
+                base_splitter = SentenceSplitter(chunk_size=safe_chunk_size)
                 nodes = base_splitter.get_nodes_from_documents([doc])
                 logger.debug(f"Document {i+1} split into {len(nodes)} sentence chunks.")
 

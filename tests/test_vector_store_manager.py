@@ -14,13 +14,13 @@ class DummyDocument:
 
 
 class DummyDocumentNoText:
-    def __init__(self, extra_info=None):
+    def __init__(self, text=None, extra_info=None):
         self.extra_info = extra_info or {}
 
 
 class DummySplitter:
     def __init__(self, *args, **kwargs):
-        pass
+        self.chunk_size = kwargs.get("chunk_size")
 
     def get_nodes_from_documents(self, docs):
         return [f"node-{idx}" for idx, _ in enumerate(docs)]
@@ -73,6 +73,14 @@ class DummyQueryEngine:
 
     def query(self, query):
         return types.SimpleNamespace(response="ok", metadata={})
+
+
+class ExplodingSplitter:
+    def __init__(self, *args, **kwargs):
+        self.chunk_size = kwargs.get("chunk_size")
+
+    def get_nodes_from_documents(self, _docs):
+        raise ValueError("boom")
 
 
 @pytest.fixture
@@ -138,5 +146,90 @@ def test_create_vector_store_handles_missing_text(monkeypatch, patched_manager):
     patched_manager.create_vector_store(["content"], [{"source": "test"}])
 
     assert patched_manager.query_engine is not None
+
+
+def test_fallback_splitter_scales_with_metadata(monkeypatch, patched_manager):
+    long_meta = "x" * 5000
+    captured = {}
+
+    monkeypatch.setattr(
+        "papairus.chat_with_repo.vector_store_manager.SemanticSplitterNodeParser",
+        ExplodingSplitter,
+    )
+
+    def capturing_splitter(**kwargs):
+        captured["chunk_size"] = kwargs["chunk_size"]
+        return DummySplitter(**kwargs)
+
+    monkeypatch.setattr(
+        "papairus.chat_with_repo.vector_store_manager.SentenceSplitter",
+        lambda **kwargs: capturing_splitter(**kwargs),
+    )
+
+    patched_manager.create_vector_store(["content"], [long_meta])
+
+    assert captured["chunk_size"] >= len(long_meta)
+
+
+def test_query_store_without_engine_returns_empty():
+    manager = VectorStoreManager(top_k=1, llm="llm", embed_model="embed")
+
+    assert manager.query_store("anything") == []
+
+
+def test_extract_doc_text_handles_missing_and_callable():
+    from papairus.chat_with_repo.vector_store_manager import _extract_doc_text
+
+    class WithText:
+        text = "hello"
+
+    class WithGetter:
+        def __init__(self, value=None, should_raise=False):
+            self.value = value
+            self.should_raise = should_raise
+
+        def get_text(self):
+            if self.should_raise:
+                raise ValueError("boom")
+            return self.value
+
+    assert _extract_doc_text(WithText()) == "hello"
+    assert _extract_doc_text(WithGetter("alt")) == "alt"
+    assert _extract_doc_text(WithGetter()) == ""
+    assert _extract_doc_text(WithGetter(should_raise=True)) == ""
+
+
+def test_create_vector_store_skips_when_missing_data(patched_manager):
+    patched_manager.create_vector_store([], [])
+
+    assert patched_manager.query_engine is None
+
+
+def test_create_vector_store_handles_empty_nodes(monkeypatch, patched_manager):
+    class EmptySplitter:
+        def __init__(self, *args, **kwargs):
+            self.chunk_size = kwargs.get("chunk_size")
+
+        def get_nodes_from_documents(self, docs):
+            return []
+
+    monkeypatch.setattr(
+        "papairus.chat_with_repo.vector_store_manager.SemanticSplitterNodeParser",
+        EmptySplitter,
+    )
+    monkeypatch.setattr(
+        "papairus.chat_with_repo.vector_store_manager.SentenceSplitter",
+        EmptySplitter,
+    )
+
+    patched_manager.create_vector_store(["content"], [{"source": "test"}])
+
+    assert patched_manager.query_engine is None
+
+
+def test_query_store_with_engine(monkeypatch, patched_manager):
+    patched_manager.query_engine = DummyQueryEngine()
+
+    assert patched_manager.query_store("query") == [{"text": "ok", "metadata": {}}]
 
 

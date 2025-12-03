@@ -1,7 +1,7 @@
-from pathlib import Path
 import runpy
-import types
 import sys
+import types
+from pathlib import Path
 
 import click
 import pytest
@@ -9,11 +9,11 @@ from click.testing import CliRunner
 
 from papairus import main
 from papairus.settings import (
-    SettingsManager,
-    Setting,
-    ProjectSettings,
     ChatCompletionSettings,
     LogLevel,
+    ProjectSettings,
+    Setting,
+    SettingsManager,
 )
 
 

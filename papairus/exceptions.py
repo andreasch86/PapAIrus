@@ -1,5 +1,6 @@
 import click
 
+
 class NoChangesWarning(click.ClickException):
     exit_code = 3
 

@@ -1,7 +1,7 @@
 import pytest
 from pydantic import ValidationError
 
-from papairus.settings import ChatCompletionSettings, ProjectSettings, SettingsManager, LogLevel
+from papairus.settings import ChatCompletionSettings, LogLevel, ProjectSettings, SettingsManager
 
 
 def test_language_validation_accepts_uk_english():
