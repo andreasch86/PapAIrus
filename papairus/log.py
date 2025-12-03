@@ -44,7 +44,9 @@ def set_logger_level_from_config(log_level):
       all logs consistently across the application.
     """
     logger.remove()
-    logger.add(sys.stderr, level=log_level, enqueue=True, backtrace=False, diagnose=False)
+    # Use synchronous logging to avoid background queue threads writing to closed
+    # streams during test teardown or CLI exit in constrained environments.
+    logger.add(sys.stderr, level=log_level, enqueue=False, backtrace=False, diagnose=False)
 
     # Intercept standard logging
     logging.basicConfig(handlers=[InterceptHandler()], level=0, force=True)
