@@ -13,6 +13,11 @@ class DummyDocument:
         self.extra_info = extra_info or {}
 
 
+class DummyDocumentNoText:
+    def __init__(self, extra_info=None):
+        self.extra_info = extra_info or {}
+
+
 class DummySplitter:
     def __init__(self, *args, **kwargs):
         pass
@@ -123,5 +128,15 @@ def test_create_vector_store_uses_text_attribute(patched_manager):
 
     assert patched_manager.query_engine is not None
     assert patched_manager.query_engine.retriever.index.nodes == ["node-0"]
+
+
+def test_create_vector_store_handles_missing_text(monkeypatch, patched_manager):
+    monkeypatch.setattr(
+        "papairus.chat_with_repo.vector_store_manager.Document",
+        DummyDocumentNoText,
+    )
+    patched_manager.create_vector_store(["content"], [{"source": "test"}])
+
+    assert patched_manager.query_engine is not None
 
 
