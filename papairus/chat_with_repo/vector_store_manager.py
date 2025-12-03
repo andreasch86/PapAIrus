@@ -50,6 +50,16 @@ def _raise_embedding_model_error(exc: Exception, embed_model) -> None:
         raise MissingEmbeddingModelError(details) from exc
 
 
+def _normalize_model_name(name: str | None) -> str | None:
+    """Return the base model name without Ollama tag suffixes."""
+
+    if not name:
+        return None
+
+    # Ollama tags come back as "model:tag"; the embed_model uses the base name.
+    return name.split(":", 1)[0]
+
+
 def _list_ollama_models(base_url: str | None) -> list[str] | None:
     """Return available Ollama model names or None if the endpoint is unreachable."""
 
@@ -64,7 +74,13 @@ def _list_ollama_models(base_url: str | None) -> list[str] | None:
 
     payload = response.json()
     models = payload.get("models", []) if isinstance(payload, dict) else []
-    return [entry.get("name") for entry in models if isinstance(entry, dict)]
+
+    normalized = {
+        _normalize_model_name(entry.get("name"))
+        for entry in models
+        if isinstance(entry, dict)
+    }
+    return sorted(model for model in normalized if model)
 
 
 def _ensure_embedding_model_available(embed_model) -> None:
@@ -74,14 +90,18 @@ def _ensure_embedding_model_available(embed_model) -> None:
         model_name = getattr(embed_model, "model_name", None) or getattr(
             embed_model, "model", "nomic-embed-text"
         )
+        normalized_model_name = _normalize_model_name(model_name) or model_name
         base_url = getattr(embed_model, "base_url", None)
 
         available_models = _list_ollama_models(base_url)
-        if available_models is not None and model_name not in available_models:
+        if (
+            available_models is not None
+            and normalized_model_name not in available_models
+        ):
             raise MissingEmbeddingModelError(
                 "Ollama embedding model '{model}' is not available at {url}. "
                 "Run `ollama pull {model}` and retry chat-with-repo.".format(
-                    model=model_name, url=base_url
+                    model=normalized_model_name, url=base_url
                 )
             )
 

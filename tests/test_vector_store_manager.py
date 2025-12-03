@@ -416,6 +416,39 @@ def test_ollama_tag_listing_success(monkeypatch):
     assert _list_ollama_models("http://localhost:11434") == ["a", "b"]
 
 
+def test_model_normalization_handles_missing_name():
+    from papairus.chat_with_repo.vector_store_manager import _normalize_model_name
+
+    assert _normalize_model_name(None) is None
+
+
+def test_ollama_tag_listing_skips_when_no_base_url():
+    from papairus.chat_with_repo.vector_store_manager import _list_ollama_models
+
+    assert _list_ollama_models(None) is None
+
+
+def test_ollama_tag_listing_strips_latest(monkeypatch):
+    from papairus.chat_with_repo.vector_store_manager import _list_ollama_models
+
+    class FakeResponse:
+        def __init__(self):
+            self.status_code = 200
+
+        def raise_for_status(self):
+            return None
+
+        def json(self):
+            return {"models": [{"name": "nomic-embed-text:latest"}]}
+
+    monkeypatch.setattr(
+        "papairus.chat_with_repo.vector_store_manager.requests.get",
+        lambda *_args, **_kwargs: FakeResponse(),
+    )
+
+    assert _list_ollama_models("http://localhost:11434") == ["nomic-embed-text"]
+
+
 def test_preflight_raises_when_tags_show_missing(monkeypatch):
     from papairus.chat_with_repo.vector_store_manager import (
         _ensure_embedding_model_available,
@@ -432,5 +465,21 @@ def test_preflight_raises_when_tags_show_missing(monkeypatch):
         _ensure_embedding_model_available(embed_model)
 
     assert "missing" in str(excinfo.value)
+
+
+def test_preflight_accepts_tagged_model(monkeypatch):
+    from papairus.chat_with_repo.vector_store_manager import (
+        _ensure_embedding_model_available,
+    )
+
+    monkeypatch.setattr(
+        "papairus.chat_with_repo.vector_store_manager._list_ollama_models",
+        lambda _base_url: ["nomic-embed-text"],
+    )
+
+    embed_model = DummyEmbedModel(model_name="nomic-embed-text:latest", base_url="http://localhost:11434")
+
+    # Should not raise since the normalized model name is present.
+    _ensure_embedding_model_available(embed_model)
 
 
