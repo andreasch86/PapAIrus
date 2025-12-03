@@ -173,4 +173,5 @@ config.toml
 .project_doc_record
 
 # Gradio
-.gradio
+.gradiostaticfiles/
+staticfiles/

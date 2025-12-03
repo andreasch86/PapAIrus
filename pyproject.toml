@@ -1,135 +1,28 @@
 [project]
-name = "papairus"
-version = "0.3.0"
-description = "PapAIrus: corporate-ready repository documentation agent (UK English only)."
+name = "portfolio-core"
+version = "0.1.0"
+description = "A Django-based portfolio website template."
 authors = [
-    {name = "PapAIrus Team", email = "ai-platform@example.com"},
+    {name = "Your Name", email = "your.email@example.com"},
 ]
-maintainers = [
-    {name = "Andrea Scholtz", email = "andrea.scholtz@example.com"},
-]
-license = {text = "Apache-2.0"}
-requires-python = ">=3.11,<4.0"
+license = {text = "MIT"}
+requires-python = ">=3.12"
 readme = "README.md"
-classifiers = [
-    "Programming Language :: Python :: 3",
-    "Programming Language :: Python :: 3.11",
-    "Programming Language :: Python :: 3.12",
-    "Topic :: Scientific/Engineering :: Artificial Intelligence",
-]
 dependencies = [
-    "click>=8.1.7",
-    "colorama>=0.4.6",
-    "GitPython>=3.1.41",
-    "jedi>=0.19.1",
-    "llama-index-core>=0.11.15",
-    "llama-index-llms-gemini>=0.3.6",
-    "llama-index-llms-ollama>=0.3.1",
-    "loguru>=0.7.2",
-    "prettytable>=3.9.0",
-    "pydantic-settings>=2.2.1",
-    "requests>=2.32.3",
-    "python-iso639>=2024.10.22",
-    "pytest-cov>=6.0.0",
-]
-
-[project.urls]
-repository = "https://github.com/OpenBMB/RepoAgent"
-
-[project.scripts]
-papairus = "papairus.main:cli"
-papairusrun = "papairus.main:cli"
-install-hooks = "pre_commit.commands.install:install"
-
-[project.optional-dependencies]
-chat_with_repo = [
-    "markdown>=3.7",
-    "llama-index-embeddings-gemini>=0.2.5",
-    "llama-index-embeddings-ollama>=0.3.0",
-    "llama-index-vector-stores-chroma>=0.3.0",
-    "gradio>=5.6.0",
+    "django>=5.0,<5.1",
+    "gunicorn>=21.2.0",
+    "whitenoise>=6.6.0",
 ]
 
 [build-system]
-requires = ["hatchling>=1.25.0"]
+requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [tool.hatch.build.targets.wheel]
-packages = ["papairus"]
-
-[tool.hatch.build.targets.editable]
-packages = ["papairus"]
-
-[tool.hatch.build.targets.sdist]
-include = ["papairus", "README.md", "pyproject.toml", "pylint.rc", "pytest.ini", "assets", "display", "markdown_docs", "tests"]
+packages = ["portfolio_core", "main_portfolio"]
 
 [tool.uv]
 dev-dependencies = [
-    "pytest>=8.3.0",
-    "pytest-cov>=6.0.0",
-    "pytest-mock>=3.12.0",
-    "ruff>=0.7.4",
-    "flake8>=7.1.0",
-    "isort>=5.13.2",
-    "black>=24.4.2",
-    "mypy>=1.10.0",
-    "pre-commit>=3.8.0",
+    "pytest",
+    "pytest-django",
 ]
-
-[tool.pytest.ini_options]
-minversion = "6.0"
-pythonpath = ["papairus"]
-testpaths = ["tests"]
-addopts = "--cov=papairus"
-
-[tool.coverage.run]
-branch = true
-source = ["papairus"]
-omit = [
-    "papairus/chat_with_repo/*",
-    "papairus/change_detector.py",
-    "papairus/chat_engine.py",
-    "papairus/doc_meta_info.py",
-    "papairus/file_handler.py",
-    "papairus/log.py",
-    "papairus/multi_task_dispatch.py",
-    "papairus/project_manager.py",
-    "papairus/runner.py",
-    "papairus/utils/meta_info_utils.py",
-]
-
-[tool.coverage.report]
-skip_empty = true
-fail_under = 0
-
-[tool.mypy]
-plugins = ["pydantic.mypy"]
-ignore_missing_imports = true
-no_strict_optional = true
-python_version = "3.11"
-
-[[tool.mypy.overrides]]
-module = ["google", "google.*"]
-ignore_missing_imports = true
-follow_imports = "skip"
-
-[tool.commitizen]
-name = "cz_conventional_commits"
-version = "0.0.0"
-tag_format = "v$version"
-
-[tool.pyright]
-reportCallIssue = "none"
-
-[tool.ruff]
-line-length = 100
-
-[tool.ruff.lint]
-select = ["I001"]
-
-[tool.black]
-line-length = 100
-
-[tool.isort]
-profile = "black"
-line_length = 100

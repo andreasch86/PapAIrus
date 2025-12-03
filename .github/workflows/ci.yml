@@ -1,11 +1,11 @@
-name: CI
+name: CI/CD
 
 on:
   push:
     branches: ["**"]
 
 jobs:
-  lint-and-test:
+  test:
     runs-on: ubuntu-latest
 
     steps:
@@ -15,7 +15,7 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
-          python-version: '3.11'
+          python-version: '3.12'
 
       - name: Install uv
         run: pip install uv
@@ -23,8 +23,34 @@ jobs:
       - name: Install dependencies
         run: uv sync --all-extras --dev
 
-      - name: Run pre-commit
-        run: uv run pre-commit run --all-files
+      - name: Run tests
+        run: uv run python manage.py test
 
-      - name: Run tests with coverage
-        run: uv run pytest --cov-report=xml
+  deploy:
+    if: github.ref == 'refs/heads/main'
+    needs: test
+    runs-on: ubuntu-latest
+    permissions:
+      contents: 'read'
+      id-token: 'write'
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      # NOTE: Authentication to GCP and deployment steps would go here.
+      # You need to set up Workload Identity Federation or use a service account key.
+      # See: https://github.com/google-github-actions/auth
+
+      # - name: Google Auth
+      #   uses: google-github-actions/auth@v2
+      #   with:
+      #     workload_identity_provider: 'projects/123456789/locations/global/workloadIdentityPools/my-pool/providers/my-provider'
+      #     service_account: 'my-service-account@my-project.iam.gserviceaccount.com'
+
+      # - name: Deploy to Cloud Run
+      #   uses: google-github-actions/deploy-cloudrun@v2
+      #   with:
+      #     service: my-service
+      #     region: us-central1
+      #     source: .
