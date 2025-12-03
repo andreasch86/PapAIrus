@@ -6,7 +6,7 @@ from llama_index.core.query_engine import RetrieverQueryEngine
 from llama_index.core.retrievers import VectorIndexRetriever
 from llama_index.vector_stores.chroma import ChromaVectorStore
 
-from papairus.exceptions import MissingEmbeddingModelError
+from papairus.exceptions import EmbeddingServiceError, MissingEmbeddingModelError
 from papairus.log import logger
 
 
@@ -38,6 +38,7 @@ def _raise_embedding_model_error(exc: Exception, embed_model) -> None:
     base_url = getattr(embed_model, "base_url", None)
     message = str(exc).lower()
     status = getattr(exc, "status_code", None)
+    normalized_model_name = _normalize_model_name(model_name) or model_name
 
     if (status == 404 or "not found" in message) and "model" in message:
         details = (
@@ -48,6 +49,21 @@ def _raise_embedding_model_error(exc: Exception, embed_model) -> None:
             details += f" against base URL {base_url}"
         details += " before retrying chat-with-repo."
         raise MissingEmbeddingModelError(details) from exc
+
+    connection_error_markers = (
+        "connection refused",
+        "failed to establish a new connection",
+        "connection reset",
+        "eof",
+        "timeout",
+    )
+    if status in {500, 502, 503} or any(marker in message for marker in connection_error_markers):
+        target = base_url or "the configured Ollama host"
+        raise EmbeddingServiceError(
+            "Embedding request to {target} failed for model '{model}'. "
+            "Ensure the Ollama daemon is reachable and the embedding model is healthy."
+            .format(target=target, model=normalized_model_name)
+        ) from exc
 
 
 def _normalize_model_name(name: str | None) -> str | None:
@@ -94,6 +110,13 @@ def _ensure_embedding_model_available(embed_model) -> None:
         base_url = getattr(embed_model, "base_url", None)
 
         available_models = _list_ollama_models(base_url)
+        if base_url and available_models is None:
+            raise EmbeddingServiceError(
+                "Could not reach Ollama at {url}. Ensure the daemon is running,"
+                " accessible, and that the host/port matches the chat-with-repo"
+                " configuration.".format(url=base_url)
+            )
+
         if (
             available_models is not None
             and normalized_model_name not in available_models

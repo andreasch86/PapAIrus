@@ -5,7 +5,7 @@ import pytest
 pytest.importorskip("chromadb")
 
 from papairus.chat_with_repo.vector_store_manager import VectorStoreManager
-from papairus.exceptions import MissingEmbeddingModelError
+from papairus.exceptions import EmbeddingServiceError, MissingEmbeddingModelError
 
 
 class DummyDocument:
@@ -151,7 +151,7 @@ def patched_manager(monkeypatch):
     )
     monkeypatch.setattr(
         "papairus.chat_with_repo.vector_store_manager._list_ollama_models",
-        lambda _base_url: None,
+        lambda _base_url: ["dummy-embed"],
     )
     manager = VectorStoreManager(top_k=1, llm="llm", embed_model=DummyEmbedModel())
     return manager
@@ -318,6 +318,11 @@ def test_preflight_embedding_check_runs_once(monkeypatch, patched_manager):
 
     patched_manager.embed_model = FailingEmbedModel(model_name="missing-embed")
 
+    monkeypatch.setattr(
+        "papairus.chat_with_repo.vector_store_manager._list_ollama_models",
+        lambda _base_url: ["missing-embed"],
+    )
+
     with pytest.raises(MissingEmbeddingModelError):
         patched_manager.create_vector_store(["content"], [{"source": "test"}])
 
@@ -362,7 +367,51 @@ def test_missing_embedding_model_includes_base_url():
     assert "http://localhost:11434" in str(excinfo.value)
 
 
-def test_batch_embedding_failure_surfaces_base_url():
+def test_raise_embedding_model_error_noop_for_unmatched():
+    from papairus.chat_with_repo.vector_store_manager import _raise_embedding_model_error
+
+    embed_model = DummyEmbedModel(model_name="dummy-embed", base_url="http://localhost:11434")
+
+    # Should fall through without raising when the error is unrelated to embedding availability.
+    _raise_embedding_model_error(FakeResponseError("bad request", status_code=400), embed_model)
+
+
+def test_raise_embedding_model_error_handles_connection_markers():
+    from papairus.chat_with_repo.vector_store_manager import _raise_embedding_model_error
+
+    embed_model = DummyEmbedModel(model_name="dummy-embed", base_url="http://localhost:11434")
+
+    with pytest.raises(EmbeddingServiceError):
+        _raise_embedding_model_error(
+            FakeResponseError("connection refused by host", status_code=None),
+            embed_model,
+        )
+
+
+def test_missing_embedding_model_detected_by_message_only():
+    from papairus.chat_with_repo.vector_store_manager import _raise_embedding_model_error
+
+    embed_model = DummyEmbedModel(model_name="nomic-embed-text", base_url=None)
+
+    with pytest.raises(MissingEmbeddingModelError):
+        _raise_embedding_model_error(
+            FakeResponseError("the specified model was not found", status_code=None),
+            embed_model,
+        )
+
+
+def test_list_models_returns_none_when_request_fails(monkeypatch):
+    from papairus.chat_with_repo.vector_store_manager import _list_ollama_models
+
+    monkeypatch.setattr(
+        "papairus.chat_with_repo.vector_store_manager.requests.get",
+        lambda *_args, **_kwargs: (_ for _ in ()).throw(RuntimeError("boom")),
+    )
+
+    assert _list_ollama_models("http://localhost:11434") is None
+
+
+def test_batch_embedding_failure_surfaces_base_url(monkeypatch):
     from papairus.chat_with_repo.vector_store_manager import (
         _ensure_embedding_model_available,
     )
@@ -373,6 +422,11 @@ def test_batch_embedding_failure_surfaces_base_url():
 
         def get_text_embedding_batch(self, texts):
             raise FakeResponseError("model \"missing-embed\" not found", status_code=404)
+
+    monkeypatch.setattr(
+        "papairus.chat_with_repo.vector_store_manager._list_ollama_models",
+        lambda _base_url: ["missing-embed"],
+    )
 
     with pytest.raises(MissingEmbeddingModelError) as excinfo:
         _ensure_embedding_model_available(FailingBatchEmbed())
@@ -481,5 +535,53 @@ def test_preflight_accepts_tagged_model(monkeypatch):
 
     # Should not raise since the normalized model name is present.
     _ensure_embedding_model_available(embed_model)
+
+
+def test_preflight_raises_when_ollama_unreachable(monkeypatch):
+    from papairus.chat_with_repo.vector_store_manager import (
+        _ensure_embedding_model_available,
+    )
+
+    # Simulate unreachable Ollama host during tag listing
+    monkeypatch.setattr(
+        "papairus.chat_with_repo.vector_store_manager._list_ollama_models",
+        lambda _base_url: None,
+    )
+
+    embed_model = DummyEmbedModel(
+        model_name="nomic-embed-text", base_url="http://localhost:65535"
+    )
+
+    with pytest.raises(EmbeddingServiceError) as excinfo:
+        _ensure_embedding_model_available(embed_model)
+
+    assert "localhost:65535" in str(excinfo.value)
+
+
+def test_preflight_surfaces_embedding_transport_error(monkeypatch):
+    from papairus.chat_with_repo.vector_store_manager import (
+        _ensure_embedding_model_available,
+    )
+
+    class ErroringEmbedModel(DummyEmbedModel):
+        def get_text_embedding(self, _text):
+            raise FakeResponseError(
+                "do embedding request: Post \"http://127.0.0.1:64549/embedding\": EOF",
+                status_code=500,
+            )
+
+    monkeypatch.setattr(
+        "papairus.chat_with_repo.vector_store_manager._list_ollama_models",
+        lambda _base_url: ["nomic-embed-text"],
+    )
+
+    embed_model = ErroringEmbedModel(
+        model_name="nomic-embed-text", base_url="http://localhost:11434"
+    )
+
+    with pytest.raises(EmbeddingServiceError) as excinfo:
+        _ensure_embedding_model_available(embed_model)
+
+    assert "Embedding request to http://localhost:11434 failed" in str(excinfo.value)
 
 

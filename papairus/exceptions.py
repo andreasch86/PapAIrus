@@ -19,3 +19,14 @@ class MissingEmbeddingModelError(click.ClickException):
         if file is None:
             file = click.get_text_stream("stderr")
         click.secho(f"Error: {self.format_message()}", fg="red", file=file)
+
+
+class EmbeddingServiceError(click.ClickException):
+    """Raised when the Ollama embedding service cannot be reached or fails."""
+
+    exit_code = 5
+
+    def show(self, file=None):
+        if file is None:
+            file = click.get_text_stream("stderr")
+        click.secho(f"Error: {self.format_message()}", fg="red", file=file)
