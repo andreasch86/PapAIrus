@@ -5,6 +5,7 @@ import pytest
 pytest.importorskip("chromadb")
 
 from papairus.chat_with_repo.vector_store_manager import VectorStoreManager
+from papairus.exceptions import MissingEmbeddingModelError
 
 
 class DummyDocument:
@@ -73,6 +74,12 @@ class DummyQueryEngine:
 
     def query(self, query):
         return types.SimpleNamespace(response="ok", metadata={})
+
+
+class FakeResponseError(Exception):
+    def __init__(self, message="model missing", status_code=404):
+        super().__init__(message)
+        self.status_code = status_code
 
 
 class ExplodingSplitter:
@@ -231,5 +238,51 @@ def test_query_store_with_engine(monkeypatch, patched_manager):
     patched_manager.query_engine = DummyQueryEngine()
 
     assert patched_manager.query_store("query") == [{"text": "ok", "metadata": {}}]
+
+
+def test_missing_embedding_model_raises_clear_error(monkeypatch, patched_manager):
+    patched_manager.embed_model = types.SimpleNamespace(
+        model_name="missing-embed", base_url="http://localhost:11434"
+    )
+
+    def failing_index(*_args, **_kwargs):
+        raise FakeResponseError("model \"missing-embed\" not found", status_code=404)
+
+    monkeypatch.setattr(
+        "papairus.chat_with_repo.vector_store_manager.VectorStoreIndex", failing_index
+    )
+
+    with pytest.raises(MissingEmbeddingModelError) as excinfo:
+        patched_manager.create_vector_store(["content"], [{"source": "test"}])
+
+    assert "missing-embed" in str(excinfo.value)
+
+
+def test_non_embedding_error_is_propagated(monkeypatch, patched_manager):
+    def failing_index(*_args, **_kwargs):
+        raise ValueError("explode")
+
+    monkeypatch.setattr(
+        "papairus.chat_with_repo.vector_store_manager.VectorStoreIndex", failing_index
+    )
+
+    with pytest.raises(ValueError):
+        patched_manager.create_vector_store(["content"], [{"source": "test"}])
+
+
+def test_missing_embedding_model_without_base_url(monkeypatch, patched_manager):
+    patched_manager.embed_model = types.SimpleNamespace(model_name="missing-embed")
+
+    def failing_index(*_args, **_kwargs):
+        raise FakeResponseError("model \"missing-embed\" not found", status_code=404)
+
+    monkeypatch.setattr(
+        "papairus.chat_with_repo.vector_store_manager.VectorStoreIndex", failing_index
+    )
+
+    with pytest.raises(MissingEmbeddingModelError) as excinfo:
+        patched_manager.create_vector_store(["content"], [{"source": "test"}])
+
+    assert "pull missing-embed" in str(excinfo.value)
 
 

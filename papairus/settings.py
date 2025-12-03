@@ -2,7 +2,6 @@ from enum import StrEnum
 from pathlib import Path
 from typing import Optional
 
-from iso639 import Language, LanguageNotFoundError
 from pydantic import (
     DirectoryPath,
     Field,
@@ -37,21 +36,10 @@ class ProjectSettings(BaseSettings):
     @classmethod
     def validate_language_code(cls, v: str) -> str:
         normalized = v.strip().lower()
-        if "english" in normalized:
+        if "english" in normalized or normalized in {"en", "en-us", "en-gb", "en-uk"}:
             return "English (UK)"
-        try:
-            language = Language.match(v)
-        except LanguageNotFoundError:
-            language = None
 
-        if language is None or language.name.lower() != "english":
-            try:
-                language = Language.match(normalized)
-            except LanguageNotFoundError:
-                language = None
-
-        if language is None or language.name.lower() != "english":
-            raise ValueError("PapAIrus only supports UK English output.")
+        raise ValueError("PapAIrus only supports UK English output.")
         return "English (UK)"
 
     @field_validator("log_level", mode="before")

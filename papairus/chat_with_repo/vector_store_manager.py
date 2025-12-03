@@ -5,6 +5,7 @@ from llama_index.core.query_engine import RetrieverQueryEngine
 from llama_index.core.retrievers import VectorIndexRetriever
 from llama_index.vector_stores.chroma import ChromaVectorStore
 
+from papairus.exceptions import MissingEmbeddingModelError
 from papairus.log import logger
 
 
@@ -25,6 +26,27 @@ def _extract_doc_text(doc: Document) -> str:
             return ""
 
     return ""
+
+
+def _raise_embedding_model_error(exc: Exception, embed_model) -> None:
+    """Translate Ollama embedding errors into a clear ClickException."""
+
+    model_name = getattr(embed_model, "model_name", None) or getattr(
+        embed_model, "model", "nomic-embed-text"
+    )
+    base_url = getattr(embed_model, "base_url", None)
+    message = str(exc).lower()
+    status = getattr(exc, "status_code", None)
+
+    if (status == 404 or "not found" in message) and "model" in message:
+        details = (
+            f"Ollama embedding model '{model_name}' is not available. "
+            f"Run `ollama pull {model_name}`"
+        )
+        if base_url:
+            details += f" against base URL {base_url}"
+        details += " before retrying chat-with-repo."
+        raise MissingEmbeddingModelError(details) from exc
 
 
 class VectorStoreManager:
@@ -111,9 +133,13 @@ class VectorStoreManager:
         # Set up ChromaVectorStore and load data
         vector_store = ChromaVectorStore(chroma_collection=chroma_collection)
         storage_context = StorageContext.from_defaults(vector_store=vector_store)
-        index = VectorStoreIndex(
-            all_nodes, storage_context=storage_context, embed_model=self.embed_model
-        )
+        try:
+            index = VectorStoreIndex(
+                all_nodes, storage_context=storage_context, embed_model=self.embed_model
+            )
+        except Exception as exc:  # noqa: BLE001 - surface friendly guidance
+            _raise_embedding_model_error(exc, self.embed_model)
+            raise
         retriever = VectorIndexRetriever(
             index=index, similarity_top_k=self.similarity_top_k, embed_model=self.embed_model
         )
