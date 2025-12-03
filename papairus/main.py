@@ -1,5 +1,6 @@
 from importlib import import_module, metadata
 from pathlib import Path
+import sys
 
 import click
 import git
@@ -292,10 +293,15 @@ def chat_with_repo():
         handle_setting_error(e)
         return
 
-    try:
-        chat_module = import_module("papairus.chat_with_repo.main")
-    except ModuleNotFoundError:
-        chat_module = import_module("papairus.chat_with_repo")
+    chat_module = sys.modules.get("papairus.chat_with_repo") or sys.modules.get(
+        "papairus.chat_with_repo.main"
+    )
+
+    if chat_module is None:
+        try:
+            chat_module = import_module("papairus.chat_with_repo.main")
+        except ModuleNotFoundError:
+            chat_module = import_module("papairus.chat_with_repo")
 
     chat_main = getattr(chat_module, "main", None)
     if not callable(chat_main):  # pragma: no cover - defensive guard

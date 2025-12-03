@@ -3,7 +3,19 @@ import time
 from papairus.chat_with_repo.gradio_interface import GradioInterface
 from papairus.chat_with_repo.rag import RepoAssistant
 from papairus.log import logger
-from papairus.settings import SettingsManager
+from papairus.settings import ChatCompletionSettings, SettingsManager
+
+
+def _select_repo_chat_settings(settings: ChatCompletionSettings) -> ChatCompletionSettings:
+    """Ensure chat-with-repo uses the local Gemma/Ollama stack."""
+
+    if settings.model == "gemma-local":
+        return settings
+
+    logger.info(
+        "chat-with-repo supports only Ollama/Gemma; overriding model to 'gemma-local'."
+    )
+    return settings.model_copy(update={"model": "gemma-local"})
 
 
 def main():
@@ -11,13 +23,14 @@ def main():
 
     # Load settings
     setting = SettingsManager.get_setting()
+    chat_settings = _select_repo_chat_settings(setting.chat_completion)
 
     db_path = (
         setting.project.target_repo / setting.project.hierarchy_name / "project_hierarchy.json"
     )
 
     # Initialize RepoAssistant
-    assistant = RepoAssistant(setting.chat_completion, db_path)
+    assistant = RepoAssistant(chat_settings, db_path)
 
     # Extract data
     md_contents, meta_data = assistant.json_data.extract_data()
