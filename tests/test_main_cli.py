@@ -455,3 +455,26 @@ def test_module_entrypoint_import_does_not_trigger_cli():
     module.cli = fake_cli
     importlib.reload(module)
     assert calls == {}
+
+
+def test_chat_with_repo_imports_fallback(monkeypatch):
+    dummy_module = types.SimpleNamespace(main=lambda: None)
+    attempts = {"count": 0}
+
+    def fake_import_module(name):
+        attempts["count"] += 1
+        if name == "papairus.chat_with_repo.main" and attempts["count"] == 1:
+            raise ModuleNotFoundError
+        assert name in {"papairus.chat_with_repo.main", "papairus.chat_with_repo"}
+        return dummy_module
+
+    for key in ["papairus.chat_with_repo", "papairus.chat_with_repo.main"]:
+        sys.modules.pop(key, None)
+
+    monkeypatch.setattr(main, "import_module", fake_import_module)
+
+    runner = CliRunner()
+    result = runner.invoke(main.chat_with_repo)
+
+    assert result.exit_code == 0
+    assert attempts["count"] == 2

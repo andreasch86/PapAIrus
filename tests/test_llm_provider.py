@@ -1,8 +1,9 @@
-import pytest
-import requests
 from types import SimpleNamespace
 
-from papairus.llm_provider import build_embedding_model, build_llm
+import pytest
+import requests
+
+from papairus.llm_provider import VertexGeminiLLM, build_embedding_model, build_llm
 from papairus.settings import ChatCompletionSettings
 
 
@@ -86,9 +87,102 @@ def test_build_llm_uses_gemini(monkeypatch):
     assert llm.timeout == 30
 
 
-def test_vertex_gemini_llm_raises_clear_error_on_404(monkeypatch):
-    from papairus.llm_provider import VertexGeminiLLM
+def test_build_llm_rejects_missing_gemini_api_key():
+    settings = ChatCompletionSettings.model_construct(
+        model="gemini-3-flash", gemini_api_key=None
+    )
 
+    with pytest.raises(ValueError, match="gemini_api_key must be provided"):
+        build_llm(settings)
+
+
+def test_build_llm_rejects_unknown_model():
+    settings = ChatCompletionSettings.model_construct(
+        model="unknown-model", gemini_api_key=None
+    )
+
+    with pytest.raises(ValueError, match="Unsupported model"):
+        build_llm(settings)
+
+
+def test_build_embedding_model_for_gemini(monkeypatch):
+    captured_kwargs = {}
+
+    class FakeGeminiEmbedding:
+        def __init__(self, **kwargs):
+            captured_kwargs.update(kwargs)
+
+    monkeypatch.setattr("papairus.llm_provider.GeminiEmbedding", FakeGeminiEmbedding)
+
+    settings = ChatCompletionSettings(model="gemini-1.5-flash", gemini_api_key="sekret")
+
+    embed = build_embedding_model(settings)
+
+    assert isinstance(embed, FakeGeminiEmbedding)
+    assert captured_kwargs == {
+        "model_name": "models/embedding-001",
+        "api_key": "sekret",
+    }
+
+
+def test_build_embedding_model_rejects_unknown_model():
+    settings = ChatCompletionSettings.model_construct(
+        model="unknown-model", gemini_api_key=None
+    )
+
+    with pytest.raises(ValueError, match="Unsupported model"):
+        build_embedding_model(settings)
+
+
+def test_vertex_gemini_llm_returns_text_and_usage(monkeypatch):
+    def fake_json():
+        return {
+            "candidates": [
+                {
+                    "content": {"parts": [{"text": "hello"}, {"text": " world"}]},
+                }
+            ],
+            "usage_metadata": {
+                "prompt_token_count": 1,
+                "candidates_token_count": 2,
+                "total_token_count": 3,
+            },
+        }
+
+    class FakeResponse:
+        status_code = 200
+
+        def __init__(self):
+            self.url = "https://example.com/generate"
+
+        def raise_for_status(self):
+            return None
+
+        def json(self):
+            return fake_json()
+
+    def fake_post(*_args, **_kwargs):
+        return FakeResponse()
+
+    monkeypatch.setattr("requests.post", fake_post)
+
+    llm = VertexGeminiLLM(
+        api_key="dummy",
+        base_url="https://aiplatform.googleapis.com/v1",
+        model="gemini-2.5-flash",
+        temperature=0.1,
+        timeout=5,
+    )
+
+    result = llm.chat([SimpleNamespace(content="hi")])
+
+    assert result.message.content == "hello world"
+    assert result.raw.usage.prompt_tokens == 1
+    assert result.raw.usage.completion_tokens == 2
+    assert result.raw.usage.total_tokens == 3
+
+
+def test_vertex_gemini_llm_raises_clear_error_on_404(monkeypatch):
     class FakeResponse:
         def __init__(self):
             self.status_code = 404
@@ -118,3 +212,28 @@ def test_vertex_gemini_llm_raises_clear_error_on_404(monkeypatch):
         llm.chat([SimpleNamespace(content="hello")])
 
     assert "Gemini model not found" in str(excinfo.value)
+
+
+def test_vertex_gemini_llm_raises_when_no_candidates(monkeypatch):
+    class FakeResponse:
+        status_code = 200
+        url = "https://example.com/generate"
+
+        def raise_for_status(self):
+            return None
+
+        def json(self):
+            return {"candidates": []}
+
+    monkeypatch.setattr("requests.post", lambda *_args, **_kwargs: FakeResponse())
+
+    llm = VertexGeminiLLM(
+        api_key="dummy",
+        base_url="https://aiplatform.googleapis.com/v1",
+        model="gemini-2.5-flash",
+        temperature=0.1,
+        timeout=5,
+    )
+
+    with pytest.raises(RuntimeError, match="No candidates returned"):
+        llm.chat([SimpleNamespace(content="hi")])
