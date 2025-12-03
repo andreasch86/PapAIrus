@@ -60,6 +60,17 @@ def test_build_embedding_model_for_gemma(monkeypatch):
     }
 
 
+def test_build_embedding_model_for_gemma_missing_dep(monkeypatch):
+    monkeypatch.setattr("papairus.llm_provider.OllamaEmbedding", None)
+
+    settings = ChatCompletionSettings(model="gemma-local")
+
+    with pytest.raises(ImportError) as excinfo:
+        build_embedding_model(settings)
+
+    assert "pip install \"llama-index-embeddings-ollama>=0.3.0\"" in str(excinfo.value)
+
+
 def test_build_llm_uses_gemini(monkeypatch):
     settings = ChatCompletionSettings(
         model="gemini-2.5-flash",

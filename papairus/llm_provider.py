@@ -151,9 +151,16 @@ def build_embedding_model(chat_settings: ChatCompletionSettings):
         )
 
     if chat_settings.model == "gemma-local":
-        ollama_embedding_cls = _require_dependency(
-            OllamaEmbedding, "llama-index-embeddings-ollama"
-        )
+        try:
+            ollama_embedding_cls = _require_dependency(
+                OllamaEmbedding, "llama-index-embeddings-ollama"
+            )
+        except ImportError as exc:  # pragma: no cover - defensive runtime message
+            raise ImportError(
+                "llama-index-embeddings-ollama is required for chat-with-repo. "
+                "Install it with `pip install \"llama-index-embeddings-ollama>=0.3.0\"`."
+            ) from exc
+
         return ollama_embedding_cls(
             model_name=chat_settings.ollama_embedding_model,
             base_url=chat_settings.ollama_base_url,

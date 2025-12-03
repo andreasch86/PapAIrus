@@ -19,7 +19,7 @@ def _select_repo_chat_settings(settings: ChatCompletionSettings) -> ChatCompleti
 
 
 def main():
-    logger.info("Initializing the RepoAgent chat with doc module.")
+    logger.info("Initializing the PapAIrus chat with doc module.")
 
     # Load settings
     setting = SettingsManager.get_setting()
