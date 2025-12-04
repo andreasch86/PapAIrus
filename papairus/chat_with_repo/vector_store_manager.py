@@ -1,10 +1,12 @@
 import chromadb
 import requests
 from llama_index.core import Document, StorageContext, VectorStoreIndex, get_response_synthesizer
+from llama_index.core.base.embeddings.base import BaseEmbedding
 from llama_index.core.node_parser import SemanticSplitterNodeParser, SentenceSplitter
 from llama_index.core.query_engine import RetrieverQueryEngine
 from llama_index.core.retrievers import VectorIndexRetriever
 from llama_index.vector_stores.chroma import ChromaVectorStore
+from pydantic import ConfigDict
 
 from papairus.exceptions import EmbeddingServiceError, MissingEmbeddingModelError
 from papairus.log import logger
@@ -102,53 +104,80 @@ def _list_ollama_models(base_url: str | None) -> list[str] | None:
     return sorted(model for model in normalized if model)
 
 
-class _ChunkingEmbeddingWrapper:
+class _ChunkingEmbeddingWrapper(BaseEmbedding):
     """A light wrapper that chunks embedding batches to reduce request load."""
+
+    model_config = ConfigDict(arbitrary_types_allowed=True, extra="allow")
 
     def __init__(self, embed_model, max_batch_size: int = _DEFAULT_EMBED_BATCH_SIZE):
         if max_batch_size < 1:
             raise ValueError("max_batch_size must be at least 1")
 
-        self._wrapped_embed_model = embed_model
-        self._max_batch_size = max_batch_size
+        object.__setattr__(self, "_wrapped_embed_model", embed_model)
+        object.__setattr__(self, "_max_batch_size", max_batch_size)
+
+        model_name = getattr(embed_model, "model_name", None) or getattr(
+            embed_model, "model", "unknown"
+        )
+        base_url = getattr(embed_model, "base_url", None)
+        object.__setattr__(self, "base_url", base_url)
+
+        super().__init__(model_name=model_name, embed_batch_size=max_batch_size)
+
+        # Re-assign after BaseEmbedding init to avoid any BaseModel attribute handling
+        # from stripping the internal reference.
+        object.__setattr__(self, "_wrapped_embed_model", embed_model)
+        object.__setattr__(self, "_max_batch_size", max_batch_size)
 
         # Mirror commonly inspected attributes used for logging and error handling.
         for attr in ("model_name", "model", "base_url"):
             if hasattr(embed_model, attr):
-                setattr(self, attr, getattr(embed_model, attr))
+                object.__setattr__(self, attr, getattr(embed_model, attr))
 
-    def get_text_embedding(self, text):
-        if hasattr(self._wrapped_embed_model, "get_text_embedding"):
-            return self._wrapped_embed_model.get_text_embedding(text)
-        raise AttributeError("Underlying embed model does not support get_text_embedding")
+    def _get_text_embedding(self, text: str):
+        wrapped = object.__getattribute__(self, "_wrapped_embed_model")
 
-    def get_text_embedding_batch(self, texts):
-        # Prefer the batch API if available, chunking to avoid oversized payloads.
-        if hasattr(self._wrapped_embed_model, "get_text_embedding_batch"):
-            batched_embeddings = []
+        if hasattr(wrapped, "get_text_embedding"):
+            return wrapped.get_text_embedding(text)
+        raise AttributeError("Underlying embed model does not support embedding APIs")
+
+    def _get_query_embedding(self, query: str):
+        return self._get_text_embedding(query)
+
+    async def _aget_query_embedding(self, query: str):
+        import asyncio
+
+        return await asyncio.to_thread(self._get_query_embedding, query)
+
+    def _get_text_embeddings(self, texts):
+        wrapped = object.__getattribute__(self, "_wrapped_embed_model")
+
+        if hasattr(wrapped, "get_text_embedding_batch"):
+            embeddings = []
             text_list = list(texts)
             for start in range(0, len(text_list), self._max_batch_size):
-                chunk = text_list[start : start + self._max_batch_size]
-                batched_embeddings.extend(
-                    self._wrapped_embed_model.get_text_embedding_batch(chunk)
-                )
-            return batched_embeddings
+                batch = text_list[start : start + self._max_batch_size]
+                embeddings.extend(wrapped.get_text_embedding_batch(batch))
+            return embeddings
 
-        # Fall back to per-item embedding if only the single API exists.
-        if hasattr(self._wrapped_embed_model, "get_text_embedding"):
-            return [self._wrapped_embed_model.get_text_embedding(text) for text in texts]
+        if hasattr(wrapped, "get_text_embedding"):
+            return [wrapped.get_text_embedding(text) for text in texts]
 
         raise AttributeError("Underlying embed model does not support embedding APIs")
 
     def __getattr__(self, name):
         # Delegate any other attributes to the wrapped embed model.
-        return getattr(self._wrapped_embed_model, name)
+        if name.startswith("_"):
+            return object.__getattribute__(self, name)
+
+        wrapped = object.__getattribute__(self, "_wrapped_embed_model")
+        return getattr(wrapped, name)
 
 
 def _wrap_chunking_embed_model(embed_model, max_batch_size: int | None = None):
     """Wrap embed_model with chunked batching unless already wrapped."""
 
-    if hasattr(embed_model, "_wrapped_embed_model"):
+    if isinstance(embed_model, _ChunkingEmbeddingWrapper):
         return embed_model
 
     if max_batch_size is not None and max_batch_size < 1:
