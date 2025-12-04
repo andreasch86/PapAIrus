@@ -29,6 +29,9 @@ def _extract_doc_text(doc: Document) -> str:
     return ""
 
 
+_DEFAULT_EMBED_BATCH_SIZE = 32
+
+
 def _raise_embedding_model_error(exc: Exception, embed_model) -> None:
     """Translate Ollama embedding errors into a clear ClickException."""
 
@@ -99,6 +102,62 @@ def _list_ollama_models(base_url: str | None) -> list[str] | None:
     return sorted(model for model in normalized if model)
 
 
+class _ChunkingEmbeddingWrapper:
+    """A light wrapper that chunks embedding batches to reduce request load."""
+
+    def __init__(self, embed_model, max_batch_size: int = _DEFAULT_EMBED_BATCH_SIZE):
+        if max_batch_size < 1:
+            raise ValueError("max_batch_size must be at least 1")
+
+        self._wrapped_embed_model = embed_model
+        self._max_batch_size = max_batch_size
+
+        # Mirror commonly inspected attributes used for logging and error handling.
+        for attr in ("model_name", "model", "base_url"):
+            if hasattr(embed_model, attr):
+                setattr(self, attr, getattr(embed_model, attr))
+
+    def get_text_embedding(self, text):
+        if hasattr(self._wrapped_embed_model, "get_text_embedding"):
+            return self._wrapped_embed_model.get_text_embedding(text)
+        raise AttributeError("Underlying embed model does not support get_text_embedding")
+
+    def get_text_embedding_batch(self, texts):
+        # Prefer the batch API if available, chunking to avoid oversized payloads.
+        if hasattr(self._wrapped_embed_model, "get_text_embedding_batch"):
+            batched_embeddings = []
+            text_list = list(texts)
+            for start in range(0, len(text_list), self._max_batch_size):
+                chunk = text_list[start : start + self._max_batch_size]
+                batched_embeddings.extend(
+                    self._wrapped_embed_model.get_text_embedding_batch(chunk)
+                )
+            return batched_embeddings
+
+        # Fall back to per-item embedding if only the single API exists.
+        if hasattr(self._wrapped_embed_model, "get_text_embedding"):
+            return [self._wrapped_embed_model.get_text_embedding(text) for text in texts]
+
+        raise AttributeError("Underlying embed model does not support embedding APIs")
+
+    def __getattr__(self, name):
+        # Delegate any other attributes to the wrapped embed model.
+        return getattr(self._wrapped_embed_model, name)
+
+
+def _wrap_chunking_embed_model(embed_model, max_batch_size: int | None = None):
+    """Wrap embed_model with chunked batching unless already wrapped."""
+
+    if hasattr(embed_model, "_wrapped_embed_model"):
+        return embed_model
+
+    if max_batch_size is not None and max_batch_size < 1:
+        raise ValueError("max_batch_size must be at least 1")
+
+    batch_size = max_batch_size or _DEFAULT_EMBED_BATCH_SIZE
+    return _ChunkingEmbeddingWrapper(embed_model, batch_size)
+
+
 def _ensure_embedding_model_available(embed_model) -> None:
     """Validate the configured embedding model is pullable before indexing."""
 
@@ -138,7 +197,7 @@ def _ensure_embedding_model_available(embed_model) -> None:
 
 
 class VectorStoreManager:
-    def __init__(self, top_k, llm, embed_model):
+    def __init__(self, top_k, llm, embed_model, embed_batch_size: int | None = None):
         """
         Initialize the VectorStoreManager.
         """
@@ -147,7 +206,7 @@ class VectorStoreManager:
         self.collection_name = "test"  # Default collection name
         self.similarity_top_k = top_k
         self.llm = llm
-        self.embed_model = embed_model
+        self.embed_model = _wrap_chunking_embed_model(embed_model, embed_batch_size)
 
     def create_vector_store(self, md_contents, meta_data):
         """

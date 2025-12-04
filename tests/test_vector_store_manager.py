@@ -94,6 +94,18 @@ class BatchOnlyEmbedModel:
         return [[0.1] * len(texts)]
 
 
+class ChunkingEmbedModel:
+    def __init__(self, limit=2):
+        self.limit = limit
+        self.calls = []
+
+    def get_text_embedding_batch(self, texts):
+        if len(texts) > self.limit:
+            raise RuntimeError("batch too large")
+        self.calls.append(list(texts))
+        return [[0.5] for _ in texts]
+
+
 class FakeResponseError(Exception):
     def __init__(self, message="model missing", status_code=404):
         super().__init__(message)
@@ -328,6 +340,110 @@ def test_preflight_embedding_check_runs_once(monkeypatch, patched_manager):
 
     # Should short-circuit before any splitter/index calls repeat embed attempts.
     assert call_count["count"] == 1
+
+
+def test_chunking_wrapper_splits_batches():
+    from papairus.chat_with_repo.vector_store_manager import (
+        _wrap_chunking_embed_model,
+    )
+
+    embed_model = ChunkingEmbedModel(limit=2)
+    wrapped = _wrap_chunking_embed_model(embed_model, max_batch_size=2)
+
+    result = wrapped.get_text_embedding_batch(["a", "b", "c", "d", "e"])
+
+    assert len(result) == 5
+    assert embed_model.calls == [["a", "b"], ["c", "d"], ["e"]]
+
+
+def test_chunking_wrapper_noop_when_already_wrapped():
+    from papairus.chat_with_repo.vector_store_manager import (
+        _wrap_chunking_embed_model,
+    )
+
+    embed_model = ChunkingEmbedModel(limit=3)
+    wrapped = _wrap_chunking_embed_model(embed_model, max_batch_size=2)
+
+    assert _wrap_chunking_embed_model(wrapped) is wrapped
+
+
+def test_chunking_wrapper_respects_min_batch_size():
+    from papairus.chat_with_repo.vector_store_manager import (
+        _ChunkingEmbeddingWrapper,
+        _wrap_chunking_embed_model,
+    )
+
+    with pytest.raises(ValueError):
+        _wrap_chunking_embed_model(ChunkingEmbedModel(), max_batch_size=0)
+
+    with pytest.raises(ValueError):
+        _ChunkingEmbeddingWrapper(ChunkingEmbedModel(), max_batch_size=0)
+
+
+def test_chunking_wrapper_falls_back_to_single_embed():
+    from papairus.chat_with_repo.vector_store_manager import (
+        _wrap_chunking_embed_model,
+    )
+
+    class SingleEmbed:
+        def __init__(self):
+            self.calls = []
+
+        def get_text_embedding(self, text):
+            self.calls.append(text)
+            return [0.7]
+
+    wrapped = _wrap_chunking_embed_model(SingleEmbed(), max_batch_size=3)
+
+    result = wrapped.get_text_embedding_batch(["x", "y"])
+
+    assert result == [[0.7], [0.7]]
+
+
+def test_chunking_wrapper_raises_when_missing_embedding_apis():
+    from papairus.chat_with_repo.vector_store_manager import (
+        _wrap_chunking_embed_model,
+    )
+
+    class NoEmbed:
+        pass
+
+    wrapped = _wrap_chunking_embed_model(NoEmbed())
+
+    with pytest.raises(AttributeError):
+        wrapped.get_text_embedding_batch(["x"])
+
+
+def test_chunking_wrapper_get_text_embedding_missing_method():
+    from papairus.chat_with_repo.vector_store_manager import (
+        _wrap_chunking_embed_model,
+    )
+
+    class BatchOnly:
+        def get_text_embedding_batch(self, texts):
+            return [[1.0] for _ in texts]
+
+    wrapped = _wrap_chunking_embed_model(BatchOnly())
+
+    with pytest.raises(AttributeError):
+        wrapped.get_text_embedding("nope")
+
+
+def test_chunking_wrapper_delegates_attributes():
+    from papairus.chat_with_repo.vector_store_manager import (
+        _wrap_chunking_embed_model,
+    )
+
+    class EmbedWithAttrs:
+        def __init__(self):
+            self.custom = "ok"
+
+        def get_text_embedding(self, text):
+            return [0.2]
+
+    wrapped = _wrap_chunking_embed_model(EmbedWithAttrs())
+
+    assert wrapped.custom == "ok"
 
 
 def test_preflight_batch_embedding_path(monkeypatch):
