@@ -32,6 +32,7 @@ def _extract_doc_text(doc: Document) -> str:
 
 
 _DEFAULT_EMBED_BATCH_SIZE = 32
+_MAX_EMBED_CHARS = 4096
 
 
 def _raise_embedding_model_error(exc: Exception, embed_model) -> None:
@@ -225,6 +226,56 @@ def _ensure_embedding_model_available(embed_model) -> None:
         raise
 
 
+def _get_node_content(node) -> str:
+    """Best-effort extraction of node text content for sizing decisions."""
+
+    get_content = getattr(node, "get_content", None)
+    if callable(get_content):
+        try:
+            return get_content(metadata_mode="none") or ""
+        except Exception:
+            return ""
+
+    text_value = getattr(node, "text", None)
+    if text_value:
+        return text_value
+
+    return ""
+
+
+def _rechunk_oversized_nodes(nodes, max_chars: int = _MAX_EMBED_CHARS):
+    """Ensure nodes stay under embedding-safe sizes by re-splitting long chunks."""
+
+    if not nodes:
+        return []
+
+    if max_chars < 1:
+        raise ValueError("max_chars must be at least 1")
+
+    balanced_nodes = []
+    queue = list(nodes)
+
+    while queue:
+        node = queue.pop(0)
+        content = _get_node_content(node)
+        if len(content) <= max_chars:
+            balanced_nodes.append(node)
+            continue
+
+        meta = getattr(node, "metadata", None) or getattr(node, "extra_info", None)
+        doc = Document(text=content, extra_info=meta if isinstance(meta, dict) else None)
+        splitter = SentenceSplitter(chunk_size=max_chars, chunk_overlap=max_chars // 10)
+        new_nodes = splitter.get_nodes_from_documents([doc])
+        logger.debug(
+            "Re-splitting oversized node of length %s into %s chunks for embedding safety.",
+            len(content),
+            len(new_nodes),
+        )
+        queue = list(new_nodes) + queue
+
+    return balanced_nodes
+
+
 class VectorStoreManager:
     def __init__(self, top_k, llm, embed_model, embed_batch_size: int | None = None):
         """
@@ -316,6 +367,8 @@ class VectorStoreManager:
                 logger.debug(f"Document {i+1} split into {len(nodes)} sentence chunks.")
 
             all_nodes.extend(nodes)
+
+        all_nodes = _rechunk_oversized_nodes(all_nodes)
 
         if not all_nodes:
             logger.warning("No valid nodes to add to the index after chunking.")

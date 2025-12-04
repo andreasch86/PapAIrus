@@ -5,7 +5,12 @@ import pytest
 
 pytest.importorskip("chromadb")
 
-from papairus.chat_with_repo.vector_store_manager import VectorStoreManager
+from papairus.chat_with_repo.vector_store_manager import (
+    _MAX_EMBED_CHARS,
+    VectorStoreManager,
+    _get_node_content,
+    _rechunk_oversized_nodes,
+)
 from papairus.exceptions import EmbeddingServiceError, MissingEmbeddingModelError
 
 
@@ -84,6 +89,15 @@ class DummyEmbedModel:
 
     def get_text_embedding(self, _text):
         return [0.1, 0.2]
+
+
+class OversizedNode:
+    def __init__(self, text, meta=None):
+        self.text = text
+        self.extra_info = meta or {"source": "demo"}
+
+    def get_content(self, metadata_mode=None):
+        return self.text
 
 
 class BatchOnlyEmbedModel:
@@ -241,6 +255,21 @@ def test_extract_doc_text_handles_missing_and_callable():
     assert _extract_doc_text(WithGetter(should_raise=True)) == ""
 
 
+def test_get_node_content_falls_back_to_text():
+    node = OversizedNode("node-text")
+
+    class TextOnly:
+        text = "text-only"
+
+    class Raises:
+        def get_content(self, metadata_mode=None):
+            raise RuntimeError("boom")
+
+    assert _get_node_content(node) == "node-text"
+    assert _get_node_content(TextOnly()) == "text-only"
+    assert _get_node_content(Raises()) == ""
+
+
 def test_create_vector_store_skips_when_missing_data(patched_manager):
     patched_manager.create_vector_store([], [])
 
@@ -267,6 +296,38 @@ def test_create_vector_store_handles_empty_nodes(monkeypatch, patched_manager):
     patched_manager.create_vector_store(["content"], [{"source": "test"}])
 
     assert patched_manager.query_engine is None
+
+
+def test_rechunk_oversized_nodes(monkeypatch):
+    big_text = "x" * (_MAX_EMBED_CHARS + 10)
+    oversized = OversizedNode(big_text, {"source": "demo"})
+    small = OversizedNode("ok")
+
+    class LocalSentenceSplitter:
+        def __init__(self, chunk_size, chunk_overlap=0):
+            self.chunk_size = chunk_size
+            self.chunk_overlap = chunk_overlap
+
+        def get_nodes_from_documents(self, docs):
+            text = docs[0].text
+            mid = len(text) // 2
+            return [OversizedNode(text[:mid], docs[0].extra_info), OversizedNode(text[mid:], docs[0].extra_info)]
+
+    monkeypatch.setattr(
+        "papairus.chat_with_repo.vector_store_manager.SentenceSplitter",
+        LocalSentenceSplitter,
+    )
+
+    balanced = _rechunk_oversized_nodes([oversized, small], max_chars=100)
+
+    assert len(balanced) >= 3
+    assert all(len(_get_node_content(node)) <= 100 for node in balanced)
+    assert any(node.extra_info == {"source": "demo"} for node in balanced)
+
+
+def test_rechunk_oversized_nodes_requires_positive_size():
+    with pytest.raises(ValueError):
+        _rechunk_oversized_nodes([OversizedNode("abc")], max_chars=0)
 
 
 def test_query_store_with_engine(monkeypatch, patched_manager):
