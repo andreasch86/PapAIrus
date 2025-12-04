@@ -1,3 +1,4 @@
+import asyncio
 import types
 
 import pytest
@@ -318,6 +319,24 @@ def test_missing_embedding_model_without_base_url(monkeypatch, patched_manager):
     assert "pull missing-embed" in str(excinfo.value)
 
 
+def test_missing_embedding_model_error_bubbles_from_index(monkeypatch, patched_manager):
+    patched_manager.embed_model = DummyEmbedModel(model_name="missing-embed")
+
+    def failing_index(*_args, **_kwargs):
+        raise FakeResponseError("model \"missing-embed\" not found", status_code=404)
+
+    monkeypatch.setattr(
+        "papairus.chat_with_repo.vector_store_manager._list_ollama_models",
+        lambda _base_url: ["missing-embed"],
+    )
+    monkeypatch.setattr(
+        "papairus.chat_with_repo.vector_store_manager.VectorStoreIndex", failing_index
+    )
+
+    with pytest.raises(MissingEmbeddingModelError):
+        patched_manager.create_vector_store(["content"], [{"source": "test"}])
+
+
 def test_preflight_embedding_check_runs_once(monkeypatch, patched_manager):
     call_count = {"count": 0}
 
@@ -340,6 +359,50 @@ def test_preflight_embedding_check_runs_once(monkeypatch, patched_manager):
 
     # Should short-circuit before any splitter/index calls repeat embed attempts.
     assert call_count["count"] == 1
+
+
+def test_create_vector_store_retries_with_smaller_batches(monkeypatch, patched_manager):
+    attempts = {"count": 0}
+
+    def conditional_index(nodes, storage_context=None, embed_model=None):
+        attempts["count"] += 1
+        if attempts["count"] == 1:
+            raise FakeResponseError(
+                "do embedding request: Post \"http://localhost:11434/embedding\": EOF",
+                status_code=500,
+            )
+        return DummyVectorStoreIndex(nodes, storage_context, embed_model)
+
+    monkeypatch.setattr(
+        "papairus.chat_with_repo.vector_store_manager.VectorStoreIndex", conditional_index
+    )
+
+    patched_manager.create_vector_store(["content"], [{"source": "test"}])
+
+    assert attempts["count"] == 2
+    assert getattr(patched_manager.embed_model, "embed_batch_size", None) == 1
+    assert patched_manager.query_engine is not None
+
+
+def test_embedding_error_propagates_when_already_min_batch(monkeypatch, patched_manager):
+    from papairus.chat_with_repo.vector_store_manager import _wrap_chunking_embed_model
+
+    patched_manager.embed_model = _wrap_chunking_embed_model(
+        DummyEmbedModel(), max_batch_size=1
+    )
+
+    def failing_index(*_args, **_kwargs):
+        raise FakeResponseError(
+            "do embedding request: Post \"http://localhost:11434/embedding\": EOF",
+            status_code=500,
+        )
+
+    monkeypatch.setattr(
+        "papairus.chat_with_repo.vector_store_manager.VectorStoreIndex", failing_index
+    )
+
+    with pytest.raises(EmbeddingServiceError):
+        patched_manager.create_vector_store(["content"], [{"source": "test"}])
 
 
 def test_chunking_wrapper_splits_batches():
@@ -444,6 +507,27 @@ def test_chunking_wrapper_delegates_attributes():
     wrapped = _wrap_chunking_embed_model(EmbedWithAttrs())
 
     assert wrapped.custom == "ok"
+    # Accessing a private attribute should bypass delegation.
+    assert wrapped.__getattr__("_wrapped_embed_model") is wrapped._wrapped_embed_model
+
+
+def test_chunking_wrapper_async_query_embedding():
+    from papairus.chat_with_repo.vector_store_manager import (
+        _wrap_chunking_embed_model,
+    )
+
+    class AsyncEmbed:
+        def __init__(self):
+            self.called = []
+
+        def get_text_embedding(self, text):
+            self.called.append(text)
+            return [0.3]
+
+    wrapped = _wrap_chunking_embed_model(AsyncEmbed())
+
+    assert asyncio.run(wrapped.aget_query_embedding("hello")) == [0.3]
+    assert wrapped.called == ["hello"]
 
 
 def test_preflight_batch_embedding_path(monkeypatch):

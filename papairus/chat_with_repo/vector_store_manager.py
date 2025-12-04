@@ -235,7 +235,19 @@ class VectorStoreManager:
         self.collection_name = "test"  # Default collection name
         self.similarity_top_k = top_k
         self.llm = llm
+        self._base_embed_model = embed_model
         self.embed_model = _wrap_chunking_embed_model(embed_model, embed_batch_size)
+
+    def _current_batch_size(self) -> int:
+        return int(
+            getattr(self.embed_model, "_max_batch_size", None)
+            or getattr(self.embed_model, "embed_batch_size", 1)
+        )
+
+    def _reset_embed_model_batch(self, batch_size: int) -> None:
+        base_model = getattr(self.embed_model, "_wrapped_embed_model", self._base_embed_model)
+        self.embed_model = _wrap_chunking_embed_model(base_model, batch_size)
+        _ensure_embedding_model_available(self.embed_model)
 
     def create_vector_store(self, md_contents, meta_data):
         """
@@ -314,13 +326,26 @@ class VectorStoreManager:
         # Set up ChromaVectorStore and load data
         vector_store = ChromaVectorStore(chroma_collection=chroma_collection)
         storage_context = StorageContext.from_defaults(vector_store=vector_store)
-        try:
-            index = VectorStoreIndex(
-                all_nodes, storage_context=storage_context, embed_model=self.embed_model
-            )
-        except Exception as exc:  # noqa: BLE001 - surface friendly guidance
-            _raise_embedding_model_error(exc, self.embed_model)
-            raise
+        while True:
+            try:
+                index = VectorStoreIndex(
+                    all_nodes, storage_context=storage_context, embed_model=self.embed_model
+                )
+                break
+            except Exception as exc:  # noqa: BLE001 - surface friendly guidance
+                try:
+                    _raise_embedding_model_error(exc, self.embed_model)
+                except MissingEmbeddingModelError:
+                    raise
+                except EmbeddingServiceError as embed_exc:
+                    if self._current_batch_size() > 1:
+                        logger.warning(
+                            "Embedding failed; retrying with embed batch size=1 to reduce payload."
+                        )
+                        self._reset_embed_model_batch(batch_size=1)
+                        continue
+                    raise embed_exc
+                raise
         retriever = VectorIndexRetriever(
             index=index, similarity_top_k=self.similarity_top_k, embed_model=self.embed_model
         )
