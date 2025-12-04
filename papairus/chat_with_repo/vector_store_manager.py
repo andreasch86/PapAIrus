@@ -263,8 +263,11 @@ def _rechunk_oversized_nodes(nodes, max_chars: int = _MAX_EMBED_CHARS):
             continue
 
         meta = getattr(node, "metadata", None) or getattr(node, "extra_info", None)
+        safe_chunk_size = max(max_chars, len(str(meta)) + 1 if meta is not None else max_chars)
         doc = Document(text=content, extra_info=meta if isinstance(meta, dict) else None)
-        splitter = SentenceSplitter(chunk_size=max_chars, chunk_overlap=max_chars // 10)
+        splitter = SentenceSplitter(
+            chunk_size=safe_chunk_size, chunk_overlap=safe_chunk_size // 10
+        )
         new_nodes = splitter.get_nodes_from_documents([doc])
 
         if not new_nodes or all(

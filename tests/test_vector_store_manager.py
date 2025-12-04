@@ -325,6 +325,37 @@ def test_rechunk_oversized_nodes(monkeypatch):
     assert any(node.extra_info == {"source": "demo"} for node in balanced)
 
 
+def test_rechunk_oversized_nodes_respects_metadata(monkeypatch):
+    big_text = "x" * (_MAX_EMBED_CHARS + 50)
+    meta = {"source": "demo", "notes": "y" * 5000}
+    seen_chunk_sizes = []
+
+    class CapturingSentenceSplitter:
+        def __init__(self, chunk_size, chunk_overlap=0):
+            self.chunk_size = chunk_size
+            self.chunk_overlap = chunk_overlap
+            seen_chunk_sizes.append(chunk_size)
+
+        def get_nodes_from_documents(self, docs):
+            text = docs[0].text
+            mid = len(text) // 2
+            return [
+                OversizedNode(text[:mid], docs[0].extra_info),
+                OversizedNode(text[mid:], docs[0].extra_info),
+            ]
+
+    monkeypatch.setattr(
+        "papairus.chat_with_repo.vector_store_manager.SentenceSplitter",
+        CapturingSentenceSplitter,
+    )
+
+    balanced = _rechunk_oversized_nodes([OversizedNode(big_text, meta)], max_chars=100)
+
+    assert seen_chunk_sizes and seen_chunk_sizes[0] >= len(str(meta)) + 1
+    assert all(node.extra_info == meta for node in balanced)
+    assert all(len(_get_node_content(node)) <= seen_chunk_sizes[0] for node in balanced)
+
+
 def test_rechunk_oversized_nodes_handles_no_progress(monkeypatch):
     big_text = "y" * 250
     oversized = OversizedNode(big_text, {"source": "stuck"})
