@@ -266,11 +266,31 @@ def _rechunk_oversized_nodes(nodes, max_chars: int = _MAX_EMBED_CHARS):
         doc = Document(text=content, extra_info=meta if isinstance(meta, dict) else None)
         splitter = SentenceSplitter(chunk_size=max_chars, chunk_overlap=max_chars // 10)
         new_nodes = splitter.get_nodes_from_documents([doc])
-        logger.debug(
-            "Re-splitting oversized node of length %s into %s chunks for embedding safety.",
-            len(content),
-            len(new_nodes),
-        )
+
+        if not new_nodes or all(
+            len(_get_node_content(new_node)) >= len(content) for new_node in new_nodes
+        ):
+            # The splitter returned nothing or failed to reduce the size; fall back to a
+            # deterministic slicing approach to avoid re-queuing the same oversized node
+            # repeatedly.
+            new_nodes = [
+                Document(
+                    text=content[i : i + max_chars],
+                    extra_info=meta if isinstance(meta, dict) else None,
+                )
+                for i in range(0, len(content), max_chars)
+            ]
+            logger.debug(
+                "Fallback manual rechunking split oversized node of length %s into %s fixed chunks.",
+                len(content),
+                len(new_nodes),
+            )
+        else:
+            logger.debug(
+                "Re-splitting oversized node of length %s into %s chunks for embedding safety.",
+                len(content),
+                len(new_nodes),
+            )
         queue = list(new_nodes) + queue
 
     return balanced_nodes

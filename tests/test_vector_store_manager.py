@@ -325,6 +325,32 @@ def test_rechunk_oversized_nodes(monkeypatch):
     assert any(node.extra_info == {"source": "demo"} for node in balanced)
 
 
+def test_rechunk_oversized_nodes_handles_no_progress(monkeypatch):
+    big_text = "y" * 250
+    oversized = OversizedNode(big_text, {"source": "stuck"})
+
+    class NoProgressSplitter:
+        def __init__(self, chunk_size, chunk_overlap=0):
+            self.chunk_size = chunk_size
+            self.chunk_overlap = chunk_overlap
+
+        def get_nodes_from_documents(self, docs):
+            # Always return the same oversized node to simulate a splitter that cannot
+            # reduce the size (e.g., when text lacks separators).
+            return [OversizedNode(docs[0].text, docs[0].extra_info)]
+
+    monkeypatch.setattr(
+        "papairus.chat_with_repo.vector_store_manager.SentenceSplitter",
+        NoProgressSplitter,
+    )
+
+    balanced = _rechunk_oversized_nodes([oversized], max_chars=100)
+
+    assert len(balanced) == 3
+    assert all(len(_get_node_content(node)) <= 100 for node in balanced)
+    assert all(node.extra_info == {"source": "stuck"} for node in balanced)
+
+
 def test_rechunk_oversized_nodes_requires_positive_size():
     with pytest.raises(ValueError):
         _rechunk_oversized_nodes([OversizedNode("abc")], max_chars=0)
