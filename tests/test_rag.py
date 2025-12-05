@@ -107,6 +107,27 @@ def test_generate_queries_uses_llm(patch_dependencies, tmp_path):
     assert queries == ["q1", "q2"]
 
 
+def test_generate_queries_strips_formatting(monkeypatch, patch_dependencies, tmp_path):
+    settings = ChatCompletionSettings(model="gemma-local")
+    assistant = rag_module.RepoAssistant(settings, tmp_path / "db.json")
+
+    monkeypatch.setattr(
+        assistant.weak_model,
+        "complete",
+        lambda *_: types.SimpleNamespace(
+            text=(
+                "Sure, here are the two search queries you requested:\n\n"
+                "**Query 1:**\n\n``""`\nSystem: What is this repo?\n``""`\n\n"
+                "**Query 2:**\n\n``""`\nSystem: How does it work?\n``""`"
+            )
+        ),
+    )
+
+    queries = assistant.generate_queries("ask?", num_queries=3)
+
+    assert queries == ["System: What is this repo?", "System: How does it work?"]
+
+
 def test_rerank_sorts_documents(monkeypatch, patch_dependencies, tmp_path):
     settings = ChatCompletionSettings(model="gemma-local")
     assistant = rag_module.RepoAssistant(settings, tmp_path / "db.json")

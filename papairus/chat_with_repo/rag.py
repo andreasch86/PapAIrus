@@ -30,8 +30,31 @@ class RepoAssistant:
     def generate_queries(self, query_str: str, num_queries: int = 4):
         fmt_prompt = query_generation_template.format(num_queries=num_queries - 1, query=query_str)
         response = self.weak_model.complete(fmt_prompt)
-        queries = response.text.split("\n")
-        return queries
+        raw_queries = response.text.split("\n") if hasattr(response, "text") else []
+        return self._sanitize_generated_queries(raw_queries)
+
+    def _sanitize_generated_queries(self, queries: list[str]):
+        cleaned_queries: list[str] = []
+        skip_prefixes = ("**query", "query", "sure,", "here are", "**", "-")
+
+        for query in queries:
+            if not isinstance(query, str):
+                continue
+
+            normalized = query.strip().strip("`").strip()
+            if not normalized:
+                continue
+
+            lowered = normalized.lower()
+            if lowered.startswith(skip_prefixes):
+                continue
+
+            cleaned_queries.append(normalized)
+
+        if not cleaned_queries:
+            logger.debug("No usable queries were generated from the model response.")
+
+        return cleaned_queries
 
     def rerank(self, query, docs):  # English
         response = self.weak_model.chat(
