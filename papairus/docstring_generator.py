@@ -213,8 +213,12 @@ class DocstringGenerator:
         if not needs_update:
             return None
 
-        prompt = self._build_llm_prompt(node, source_lines, existing_docstring)
-        llm_output = self._call_llm(prompt)
+        prompt, snippet = self._build_llm_prompt_payload(
+            node, source_lines, existing_docstring
+        )
+        llm_output = self._call_llm(
+            code_snippet=snippet, prompt=prompt, existing_docstring=existing_docstring
+        )
         if not llm_output:
             return None
 
@@ -349,9 +353,9 @@ class DocstringGenerator:
         indented.append(f'{body_indent}"""\n')
         return indented
 
-    def _build_llm_prompt(
+    def _build_llm_prompt_payload(
         self, node: ast.AST, source_lines: Sequence[str], existing_docstring: Optional[str]
-    ) -> str:
+    ) -> tuple[str, str]:
         source_text = "".join(source_lines)
         snippet = ast.get_source_segment(source_text, node) or ""
         header = (
@@ -361,14 +365,21 @@ class DocstringGenerator:
         if existing_docstring:
             header += " Update the existing docstring to cover missing details."
 
-        return "\n\n".join([header, "Code:", snippet])
+        prompt = "\n\n".join([header, "Code:", snippet])
+        return prompt, snippet
 
-    def _call_llm(self, prompt: str) -> str:
+    def _call_llm(
+        self, *, code_snippet: str, prompt: str, existing_docstring: Optional[str]
+    ) -> str:
         if self.llm_client is None:
             raise ValueError("LLM backend requires an llm_client instance")
 
         if isinstance(self.llm_client, LLMBackend):
-            return self.llm_client.generate_docstring(prompt)
+            return self.llm_client.generate_docstring(
+                code_snippet=code_snippet,
+                style="google",
+                existing_docstring=existing_docstring,
+            )
 
         if callable(self.llm_client):
             return str(self.llm_client(prompt))

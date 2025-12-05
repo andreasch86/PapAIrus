@@ -40,7 +40,6 @@ class ProjectSettings(BaseSettings):
             return "English (UK)"
 
         raise ValueError("PapAIrus only supports UK English output.")
-        return "English (UK)"
 
     @field_validator("log_level", mode="before")
     @classmethod
@@ -84,7 +83,6 @@ class ChatCompletionSettings(BaseSettings):
         raise ValueError(
             "Model must be gemma-local (self-hosted) or a Gemini model name starting with 'gemini-'."
         )
-        return value
 
     @field_validator("gemini_api_key")
     @classmethod

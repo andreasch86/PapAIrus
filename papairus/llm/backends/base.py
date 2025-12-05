@@ -2,9 +2,10 @@
 
 from __future__ import annotations
 
+from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from types import SimpleNamespace
-from typing import Iterable, List, Sequence
+from typing import Iterable, Sequence
 
 
 @dataclass
@@ -38,12 +39,14 @@ class LLMResponse:
         return self.message.content
 
 
-class LLMBackend:
+class LLMBackend(ABC):
     """Abstract base for all LLM backends."""
 
+    @abstractmethod
     def generate_response(self, messages: Sequence[ChatMessage]) -> LLMResponse:
-        raise NotImplementedError
+        """Return a normalized chat response for the provided messages."""
 
+    @abstractmethod
     def generate_docstring(
         self,
         code_snippet: str,
@@ -51,7 +54,7 @@ class LLMBackend:
         style: str = "google",
         existing_docstring: str | None = None,
     ) -> str:
-        raise NotImplementedError
+        """Generate a docstring for the given code snippet in the requested style."""
 
     def chat(self, messages: Sequence[ChatMessage], **_: object):
         """Compatibility shim mirroring llama-index ChatResponse shape."""
