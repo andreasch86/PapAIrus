@@ -1,16 +1,20 @@
+import os
 import sys
 from importlib import import_module, metadata
 from pathlib import Path
 
 import click
 import git
-from pydantic import ValidationError
+from pydantic import SecretStr, ValidationError
 
 from papairus.doc_meta_info import DocItem, MetaInfo
+from papairus.docstring_generator import DocstringGenerator
 from papairus.exceptions import NoChangesWarning
+from papairus.change_detector import ChangeDetector
+from papairus.llm_provider import build_llm
 from papairus.log import logger, set_logger_level_from_config
 from papairus.runner import Runner
-from papairus.settings import LogLevel, SettingsManager
+from papairus.settings import ChatCompletionSettings, LogLevel, SettingsManager
 from papairus.utils.meta_info_utils import delete_fake_files, make_fake_files
 
 try:
@@ -44,7 +48,37 @@ def handle_setting_error(e: ValidationError):
     )
 
 
-@cli.command()
+def _suggest_docs_refresh(repo: git.Repo, docs_path: Path, docs_folder_name: str) -> None:
+    """Surface documentation refresh hints when docs already exist.
+
+    Scans staged and unstaged Python changes and points to the docs
+    directory so users can refresh narratives that reflect new work.
+    """
+
+    if not docs_path.exists():
+        return
+
+    change_detector = ChangeDetector(repo.working_tree_dir)
+    staged = change_detector.get_staged_pys()
+    unstaged = [
+        diff.b_path for diff in repo.index.diff(None) if diff.b_path.endswith(".py")
+    ]
+    changed_files = set(staged.keys()) | set(unstaged)
+
+    if not changed_files:
+        click.echo(
+            f"Docs directory {docs_path} already exists. No pending code changes detected."
+        )
+        return
+
+    click.echo(
+        f"Docs directory {docs_path} already exists. Consider refreshing docs for these changes:"
+    )
+    for file_path in sorted(changed_files):
+        click.echo(f"- {file_path} -> review documentation under {docs_folder_name}/")
+
+
+@cli.command(name="create-documentation")
 @click.option(
     "--model",
     "-m",
@@ -96,7 +130,7 @@ def handle_setting_error(e: ValidationError):
 @click.option(
     "--markdown-docs-path",
     "-mdp",
-    default="markdown_docs",
+    default="docs",
     show_default=True,
     help="The folder path where Markdown documentation will be stored or generated.",
     type=str,
@@ -154,7 +188,7 @@ def handle_setting_error(e: ValidationError):
     default=False,
     help="Explicitly opt in to telemetry (off by default).",
 )
-def run(
+def create_documentation(
     model,
     temperature,
     request_timeout,
@@ -171,7 +205,7 @@ def run(
     allow_main,
     telemetry,
 ):
-    """Run the program with the specified parameters."""
+    """Generate project documentation leveraging code and existing docstrings."""
     repo = None
     try:
         repo = git.Repo(target_repo_path or ".")
@@ -183,7 +217,10 @@ def run(
             )
         )
 
+    docs_path = Path(target_repo_path or ".") / markdown_docs_path
+
     if repo:
+        _suggest_docs_refresh(repo, docs_path, markdown_docs_path)
         try:
             branch_name = repo.active_branch.name
             if branch_name in {"main", "master"} and not allow_main:
@@ -308,6 +345,138 @@ def chat_with_repo():
         raise click.ClickException("papairus.chat_with_repo.main is not callable")
 
     chat_main()
+
+
+@cli.command("generate-docstrings")
+@click.option(
+    "--path",
+    "-p",
+    default=".",
+    show_default=True,
+    type=click.Path(exists=True, file_okay=False, dir_okay=True, path_type=Path),
+    help="Root directory to scan for Python files.",
+)
+@click.option(
+    "--dry-run",
+    is_flag=True,
+    default=False,
+    help="Preview docstring updates without modifying files.",
+)
+@click.option(
+    "--backend",
+    type=click.Choice(["ast", "gemini", "gemma"], case_sensitive=False),
+    default="ast",
+    show_default=True,
+    help="Docstring generation engine to use.",
+)
+@click.option(
+    "--model",
+    default=None,
+    help=(
+        "Model identifier to use for LLM-based docstrings. Defaults to a Gemini"
+        " or Gemma model based on the backend."
+    ),
+)
+@click.option(
+    "--temperature",
+    default=0.2,
+    show_default=True,
+    help="Sampling temperature for the LLM backend.",
+)
+@click.option(
+    "--request-timeout",
+    default=60,
+    show_default=True,
+    help="Request timeout (seconds) for LLM docstring generation.",
+)
+@click.option(
+    "--gemini-base-url",
+    default="https://aiplatform.googleapis.com/v1",
+    show_default=True,
+    help="Base URL for Gemini API calls.",
+)
+@click.option(
+    "--gemini-api-key",
+    default=None,
+    envvar="GEMINI_API_KEY",
+    show_envvar=True,
+    help="API key for Gemini models.",
+)
+@click.option(
+    "--ollama-base-url",
+    default="http://localhost:11434",
+    show_default=True,
+    help="Base URL for Gemma (Ollama) models when using the Gemma backend.",
+)
+@click.option(
+    "--ollama-model",
+    default="gemma:2b",
+    show_default=True,
+    help="Ollama model name when using the Gemma backend.",
+)
+def generate_docstrings(
+    path: Path,
+    dry_run: bool,
+    backend: str,
+    model: str | None,
+    temperature: float,
+    request_timeout: int,
+    gemini_base_url: str,
+    gemini_api_key: str | None,
+    ollama_base_url: str,
+    ollama_model: str,
+):
+    """Add Google-style docstrings to callables missing complete documentation."""
+
+    backend = backend.lower()
+    llm_client = None
+
+    if backend != "ast":
+        selected_model = model
+        if selected_model is None:
+            selected_model = "gemini-2.5-flash" if backend == "gemini" else "gemma-local"
+
+        resolved_gemini_api_key = gemini_api_key or os.getenv("GEMINI_API_KEY")
+
+        try:
+            chat_settings = ChatCompletionSettings(
+                model=selected_model,
+                temperature=temperature,
+                request_timeout=request_timeout,
+                gemini_base_url=gemini_base_url,
+                gemini_api_key=(
+                    SecretStr(resolved_gemini_api_key)
+                    if resolved_gemini_api_key
+                    else None
+                ),
+                ollama_base_url=ollama_base_url,
+                ollama_model=ollama_model,
+            )
+            llm_client = build_llm(chat_settings)
+        except Exception as exc:  # pragma: no cover - defensive guard for CLI output
+            raise click.ClickException(str(exc))
+
+    generator = DocstringGenerator(path, backend=backend, llm_client=llm_client)
+
+    def _progress(path: Path, status: str) -> None:
+        if status == "start":
+            click.echo(f"[{backend}] Scanning {path}...", err=True)
+        elif status == "updated":
+            action = "Would update" if dry_run else "Updated"
+            click.echo(f" -> {action} docstrings", err=True)
+        elif status == "skipped":
+            click.echo(" -> No docstring changes", err=True)
+
+    updated_files = generator.run(dry_run=dry_run, progress_callback=_progress)
+
+    if not updated_files:
+        click.echo("No docstring updates needed.")
+        return
+
+    action = "Would update" if dry_run else "Updated"
+    click.echo(f"{action} docstrings in {len(updated_files)} file(s):")
+    for file_path in updated_files:
+        click.echo(f"- {file_path}")
 
 
 if __name__ == "__main__":  # pragma: no cover

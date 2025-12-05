@@ -290,7 +290,7 @@ def temp_repo(tmp_path, monkeypatch):
     project_settings = ProjectSettings(
         target_repo=repo_path,
         hierarchy_name=".project_doc_record",
-        markdown_docs_name="markdown_docs",
+        markdown_docs_name="docs",
         ignore_list=[],
         language="English (UK)",
         max_thread_count=1,

@@ -28,6 +28,31 @@ PapAIrus exposes the `papairus` command for documentation generation and an inte
 - **Gemma via Ollama**: set `--model gemma-local` and point to your Ollama deployment with `OLLAMA_BASE_URL`/`--base-url` (defaults to `http://localhost:11434`). Gemini keys are not required for local Gemma.
 - Embeddings follow the same provider as the model: Gemini embeddings for cloud, or `ollama_embedding_model` for local usage.
 
+### Generate or preview docstrings for Python files
+Use the `generate-docstrings` command to add Google-style docstrings to Python callables. `__init__` methods are skipped automatically.
+All PapAIrus CLI commands read the Gemini key from the `GEMINI_API_KEY` environment variable when a Gemini model is selected, so you don't need to pass it explicitly.
+
+```bash
+# AST-only generation (no network calls)
+papairus generate-docstrings --path path/to/project --dry-run
+
+# Gemini-backed generation
+export GEMINI_API_KEY=your_gemini_key
+papairus generate-docstrings --path path/to/project --backend gemini \
+  --model gemini-2.5-flash --temperature 0.2
+
+# Gemma (Ollama) generation
+papairus generate-docstrings --path path/to/project --backend gemma \
+  --ollama-base-url http://localhost:11434 --ollama-model gemma:2b
+```
+
+Key options:
+- `--backend`: choose `ast` (default), `gemini`, or `gemma`.
+- `--dry-run`: show which files would change without writing them.
+- `--model`: override the default model per backend (`gemini-2.5-flash` or `gemma-local`).
+- `--gemini-base-url`/`--gemini-api-key`: control Gemini endpoints and auth.
+- `--ollama-base-url`/`--ollama-model`: control the Gemma Ollama endpoint and model.
+
 ### Generate repository documentation (CLI)
 Run from the target repository root (or pass `--target-repo-path`):
 
@@ -35,10 +60,10 @@ Run from the target repository root (or pass `--target-repo-path`):
 # Gemini cloud generation
 export GEMINI_API_KEY=your_gemini_key
 
-papairus run --model gemini-2.5-flash --allow-main --telemetry
+papairus create-documentation --model gemini-2.5-flash --allow-main --telemetry
 
 # Local Gemma via Ollama
-papairus run --model gemma-local --base-url http://localhost:11434 --dry-run
+papairus create-documentation --model gemma-local --base-url http://localhost:11434 --dry-run
 ```
 
 Key flags:
@@ -46,7 +71,9 @@ Key flags:
 - `--dry-run`: show planned actions and git diff without writing files.
 - `--telemetry/--no-telemetry`: explicit opt-in/out switch (default off).
 - `--language` defaults to `English (UK)`; other inputs are rejected.
-- `--markdown-docs-path` and `--hierarchy-path` control where generated Markdown files and hierarchy metadata are written (default `markdown_docs` and `.project_doc_record`).
+- `--markdown-docs-path` and `--hierarchy-path` control where generated Markdown files and hierarchy metadata are written (default `docs` and `.project_doc_record`).
+
+Documentation is written to the `docs/` directory, weaving together source code and Google-style docstrings in a friendly tone. If `docs/` already exists, the CLI will point out which changed Python files need refreshed docs based on your current git state.
 
 Housekeeping helpers:
 ```bash
@@ -55,7 +82,7 @@ papairus diff
 ```
 
 ### Interactive chat over generated docs
-The chat UI uses the existing hierarchy (`.project_doc_record/project_hierarchy.json`) and Markdown outputs. After you have run `papairus run` at least once on the repository:
+The chat UI uses the existing hierarchy (`.project_doc_record/project_hierarchy.json`) and Markdown outputs. After you have run `papairus create-documentation` at least once on the repository:
 
 ```bash
 # Launches a Gradio interface at http://localhost:7860/ by default
@@ -70,7 +97,7 @@ Use the `display/` helpers to build and serve a GitBook from the Markdown docs:
 1. Create `config.yml` at the repository root to point the GitBook tools to the right paths:
    ```yaml
    repo_path: /absolute/path/to/your/repo
-   Markdown_Docs_folder: markdown_docs
+  Markdown_Docs_folder: docs
    ```
 2. Install Node.js 10.x and initialise GitBook (one-time):
    ```bash
