@@ -56,6 +56,7 @@ class LocalGemmaBackend(LLMBackend):
                 {"role": message.role, "content": message.content} for message in messages
             ],
             "options": {"temperature": self.temperature},
+            "stream": False,
         }
         endpoint = f"{self.base_url}/api/chat"
         response = requests.post(endpoint, json=payload, timeout=self.timeout)
@@ -64,7 +65,14 @@ class LocalGemmaBackend(LLMBackend):
         except HTTPError as exc:  # pragma: no cover - defensive runtime path
             raise RuntimeError(f"Ollama chat request failed: {exc}") from exc
 
-        data: dict[str, Any] = response.json()
+        try:
+            data: dict[str, Any] = response.json()
+        except ValueError as exc:  # pragma: no cover - defensive runtime path
+            truncated = response.text[:200]
+            raise RuntimeError(
+                "Ollama chat returned non-JSON response; ensure streaming is disabled "
+                f"and the model is available. Response snippet: {truncated}"
+            ) from exc
         message = data.get("message", {})
         content = message.get("content", "")
         usage_data = data.get("eval_count", 0)

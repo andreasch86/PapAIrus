@@ -406,7 +406,7 @@ def chat_with_repo():
 )
 @click.option(
     "--ollama-model",
-    default="gemma:2b",
+    default="codegemma:instruct",
     show_default=True,
     help="Ollama model name when using the Gemma backend.",
 )
