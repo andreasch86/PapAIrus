@@ -8,6 +8,7 @@ import pytest
 from click.testing import CliRunner
 
 from papairus import main
+from papairus.exceptions import NoChangesWarning
 from papairus.settings import (
     ChatCompletionSettings,
     LogLevel,
@@ -21,7 +22,7 @@ def stub_settings(repo_path):
     project_settings = ProjectSettings(
         target_repo=repo_path,
         hierarchy_name=".project_doc_record",
-        markdown_docs_name="markdown_docs",
+        markdown_docs_name="docs",
         ignore_list=[],
         language="English (UK)",
         max_thread_count=1,
@@ -36,7 +37,7 @@ def test_run_blocks_clean_repo(temp_repo):
     repo_path = temp_repo.working_tree_dir
     runner = CliRunner()
     result = runner.invoke(
-        main.run,
+        main.create_documentation,
         ["--target-repo-path", repo_path, "--allow-main"],
     )
     assert result.exit_code != 0
@@ -60,7 +61,7 @@ def test_run_dry_run_outputs_diff(temp_repo, monkeypatch):
 
     runner = CliRunner()
     result = runner.invoke(
-        main.run,
+        main.create_documentation,
         [
             "--target-repo-path",
             repo_path,
@@ -86,7 +87,7 @@ def test_run_warns_on_main_branch(monkeypatch):
     monkeypatch.setattr(main.git, "Repo", lambda _: FakeRepo())
 
     runner = CliRunner()
-    result = runner.invoke(main.run, ["--target-repo-path", "."])
+    result = runner.invoke(main.create_documentation, ["--target-repo-path", "."])
     assert result.exit_code == 0
     assert "Warning: running PapAIrus on the main branch" in result.output
 
@@ -109,7 +110,9 @@ def test_run_handles_detached_head(monkeypatch, tmp_path):
     )
 
     runner = CliRunner()
-    result = runner.invoke(main.run, ["--target-repo-path", str(tmp_path), "--allow-main"])
+    result = runner.invoke(
+        main.create_documentation, ["--target-repo-path", str(tmp_path), "--allow-main"]
+    )
     assert result.exit_code == 0
 
 
@@ -140,7 +143,7 @@ def test_run_handles_invalid_repo_and_runs(monkeypatch, tmp_path):
 
     runner = CliRunner()
     result = runner.invoke(
-        main.run,
+        main.create_documentation,
         ["--target-repo-path", str(repo_path), "--allow-main", "--model", "gemini-2.5-flash"],
     )
 
@@ -173,7 +176,9 @@ def test_run_handles_validation_error(monkeypatch, tmp_path):
     monkeypatch.setattr(main.SettingsManager, "initialize_with_params", lambda **kwargs: (_ for _ in ()).throw(validation_error))
 
     runner = CliRunner()
-    result = runner.invoke(main.run, ["--target-repo-path", str(repo_path), "--allow-main"])
+    result = runner.invoke(
+        main.create_documentation, ["--target-repo-path", str(repo_path), "--allow-main"]
+    )
     assert result.exit_code == 0
     assert called["handled"] is True
 
@@ -185,7 +190,10 @@ def test_run_dry_run_without_repo(monkeypatch, tmp_path):
     monkeypatch.setattr(main.SettingsManager, "initialize_with_params", lambda **kwargs: stub_settings(repo_path))
 
     runner = CliRunner()
-    result = runner.invoke(main.run, ["--target-repo-path", str(repo_path), "--allow-main", "--dry-run"])
+    result = runner.invoke(
+        main.create_documentation,
+        ["--target-repo-path", str(repo_path), "--allow-main", "--dry-run"],
+    )
     assert result.exit_code == 0
     assert "nothing to diff" in result.output
 
@@ -212,7 +220,7 @@ def test_run_executes_happy_path(monkeypatch, temp_repo):
 
     cli_runner = CliRunner()
     result = cli_runner.invoke(
-        main.run,
+        main.create_documentation,
         ["--target-repo-path", repo_path, "--allow-main", "--log-level", "INFO"],
     )
 
@@ -244,7 +252,7 @@ def test_run_prints_hierarchy(monkeypatch, temp_repo):
 
     cli_runner = CliRunner()
     result = cli_runner.invoke(
-        main.run,
+        main.create_documentation,
         [
             "--target-repo-path",
             str(repo_path),
@@ -254,6 +262,20 @@ def test_run_prints_hierarchy(monkeypatch, temp_repo):
     )
     assert result.exit_code == 0
     assert printed["printed"] is True
+
+
+def test_create_docs_suggests_updates_when_docs_exist(temp_repo):
+    repo_path = Path(temp_repo.working_tree_dir)
+    docs_path = repo_path / "docs"
+    docs_path.mkdir()
+
+    runner = CliRunner()
+    result = runner.invoke(
+        main.create_documentation, ["--target-repo-path", str(repo_path), "--allow-main"]
+    )
+
+    assert result.exit_code == NoChangesWarning.exit_code
+    assert "Docs directory" in result.output
 
 
 def test_clean_invokes_delete(monkeypatch):

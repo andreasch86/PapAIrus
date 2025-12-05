@@ -25,7 +25,7 @@ class LogLevel(StrEnum):
 class ProjectSettings(BaseSettings):
     target_repo: DirectoryPath = ""  # type: ignore
     hierarchy_name: str = ".project_doc_record"
-    markdown_docs_name: str = "markdown_docs"
+    markdown_docs_name: str = "docs"
     ignore_list: list[str] = []
     language: str = "English (UK)"
     max_thread_count: PositiveInt = 4

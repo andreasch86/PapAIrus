@@ -10,6 +10,7 @@ from pydantic import SecretStr, ValidationError
 from papairus.doc_meta_info import DocItem, MetaInfo
 from papairus.docstring_generator import DocstringGenerator
 from papairus.exceptions import NoChangesWarning
+from papairus.change_detector import ChangeDetector
 from papairus.llm_provider import build_llm
 from papairus.log import logger, set_logger_level_from_config
 from papairus.runner import Runner
@@ -47,7 +48,37 @@ def handle_setting_error(e: ValidationError):
     )
 
 
-@cli.command()
+def _suggest_docs_refresh(repo: git.Repo, docs_path: Path, docs_folder_name: str) -> None:
+    """Surface documentation refresh hints when docs already exist.
+
+    Scans staged and unstaged Python changes and points to the docs
+    directory so users can refresh narratives that reflect new work.
+    """
+
+    if not docs_path.exists():
+        return
+
+    change_detector = ChangeDetector(repo.working_tree_dir)
+    staged = change_detector.get_staged_pys()
+    unstaged = [
+        diff.b_path for diff in repo.index.diff(None) if diff.b_path.endswith(".py")
+    ]
+    changed_files = set(staged.keys()) | set(unstaged)
+
+    if not changed_files:
+        click.echo(
+            f"Docs directory {docs_path} already exists. No pending code changes detected."
+        )
+        return
+
+    click.echo(
+        f"Docs directory {docs_path} already exists. Consider refreshing docs for these changes:"
+    )
+    for file_path in sorted(changed_files):
+        click.echo(f"- {file_path} -> review documentation under {docs_folder_name}/")
+
+
+@cli.command(name="create-documentation")
 @click.option(
     "--model",
     "-m",
@@ -99,7 +130,7 @@ def handle_setting_error(e: ValidationError):
 @click.option(
     "--markdown-docs-path",
     "-mdp",
-    default="markdown_docs",
+    default="docs",
     show_default=True,
     help="The folder path where Markdown documentation will be stored or generated.",
     type=str,
@@ -157,7 +188,7 @@ def handle_setting_error(e: ValidationError):
     default=False,
     help="Explicitly opt in to telemetry (off by default).",
 )
-def run(
+def create_documentation(
     model,
     temperature,
     request_timeout,
@@ -174,7 +205,7 @@ def run(
     allow_main,
     telemetry,
 ):
-    """Run the program with the specified parameters."""
+    """Generate project documentation leveraging code and existing docstrings."""
     repo = None
     try:
         repo = git.Repo(target_repo_path or ".")
@@ -186,7 +217,10 @@ def run(
             )
         )
 
+    docs_path = Path(target_repo_path or ".") / markdown_docs_path
+
     if repo:
+        _suggest_docs_refresh(repo, docs_path, markdown_docs_path)
         try:
             branch_name = repo.active_branch.name
             if branch_name in {"main", "master"} and not allow_main:

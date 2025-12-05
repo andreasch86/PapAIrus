@@ -60,10 +60,10 @@ Run from the target repository root (or pass `--target-repo-path`):
 # Gemini cloud generation
 export GEMINI_API_KEY=your_gemini_key
 
-papairus run --model gemini-2.5-flash --allow-main --telemetry
+papairus create-documentation --model gemini-2.5-flash --allow-main --telemetry
 
 # Local Gemma via Ollama
-papairus run --model gemma-local --base-url http://localhost:11434 --dry-run
+papairus create-documentation --model gemma-local --base-url http://localhost:11434 --dry-run
 ```
 
 Key flags:
@@ -71,7 +71,9 @@ Key flags:
 - `--dry-run`: show planned actions and git diff without writing files.
 - `--telemetry/--no-telemetry`: explicit opt-in/out switch (default off).
 - `--language` defaults to `English (UK)`; other inputs are rejected.
-- `--markdown-docs-path` and `--hierarchy-path` control where generated Markdown files and hierarchy metadata are written (default `markdown_docs` and `.project_doc_record`).
+- `--markdown-docs-path` and `--hierarchy-path` control where generated Markdown files and hierarchy metadata are written (default `docs` and `.project_doc_record`).
+
+Documentation is written to the `docs/` directory, weaving together source code and Google-style docstrings in a friendly tone. If `docs/` already exists, the CLI will point out which changed Python files need refreshed docs based on your current git state.
 
 Housekeeping helpers:
 ```bash
@@ -80,7 +82,7 @@ papairus diff
 ```
 
 ### Interactive chat over generated docs
-The chat UI uses the existing hierarchy (`.project_doc_record/project_hierarchy.json`) and Markdown outputs. After you have run `papairus run` at least once on the repository:
+The chat UI uses the existing hierarchy (`.project_doc_record/project_hierarchy.json`) and Markdown outputs. After you have run `papairus create-documentation` at least once on the repository:
 
 ```bash
 # Launches a Gradio interface at http://localhost:7860/ by default
@@ -95,7 +97,7 @@ Use the `display/` helpers to build and serve a GitBook from the Markdown docs:
 1. Create `config.yml` at the repository root to point the GitBook tools to the right paths:
    ```yaml
    repo_path: /absolute/path/to/your/repo
-   Markdown_Docs_folder: markdown_docs
+  Markdown_Docs_folder: docs
    ```
 2. Install Node.js 10.x and initialise GitBook (one-time):
    ```bash
