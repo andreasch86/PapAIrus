@@ -32,7 +32,7 @@ def _extract_doc_text(doc: Document) -> str:
 
 
 _DEFAULT_EMBED_BATCH_SIZE = 32
-_MAX_EMBED_CHARS = 2048
+_MAX_EMBED_CHARS = 1024
 
 
 def _raise_embedding_model_error(exc: Exception, embed_model) -> None:
@@ -43,7 +43,10 @@ def _raise_embedding_model_error(exc: Exception, embed_model) -> None:
     )
     base_url = getattr(embed_model, "base_url", None)
     message = str(exc).lower()
-    status = getattr(exc, "status_code", None)
+    status = getattr(exc, "status_code", None) or getattr(
+        getattr(exc, "response", None), "status_code", None
+    )
+    message = message or str(getattr(getattr(exc, "response", None), "text", ""))
     normalized_model_name = _normalize_model_name(model_name) or model_name
 
     if (status == 404 or "not found" in message) and "model" in message:
@@ -194,12 +197,40 @@ class _ChunkingEmbeddingWrapper(BaseEmbedding):
                 "Embedding request failed because base URL or model name was not configured."
             )
 
-        response = requests.post(
-            f"{base_url}/api/embeddings",
-            json={"model": model_name, "prompt": text},
-            timeout=60,
-        )
-        response.raise_for_status()
+        payloads = [
+            {"model": model_name, "prompt": text},
+            {"model": model_name, "input": text},
+        ]
+        response = None
+        last_exc: Exception | None = None
+
+        for payload in payloads:
+            try:
+                response = requests.post(
+                    f"{base_url}/api/embeddings", json=payload, timeout=60
+                )
+                response.raise_for_status()
+                break
+            except Exception as exc:  # noqa: BLE001 - inspected below
+                last_exc = exc
+                response = None
+                # Try the alternate payload only for server-side failures.
+                status = getattr(getattr(exc, "response", None), "status_code", None)
+                if status and status >= 500:
+                    continue
+                _raise_embedding_model_error(exc, self)
+
+        if response is None:
+            _raise_embedding_model_error(
+                last_exc
+                or EmbeddingServiceError(
+                    "Embedding request to {url} failed for model '{model}'. "
+                    "Ensure the Ollama daemon is reachable and the embedding model is healthy."
+                    .format(url=base_url, model=model_name)
+                ),
+                self,
+            )
+
         payload = response.json()
 
         if isinstance(payload, dict):
