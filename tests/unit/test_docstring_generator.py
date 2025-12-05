@@ -1,5 +1,7 @@
 from pathlib import Path
 
+from llama_index.core.llms import ChatMessage
+
 from papairus.docstring_generator import DocstringGenerator
 
 
@@ -68,3 +70,36 @@ def test_llm_backend_uses_client(tmp_path):
     content = sample.read_text()
     assert "Shout text." in content
     assert "Args:" in content and "Returns:" in content
+
+
+def test_llm_backend_uses_chat_messages(tmp_path):
+    sample = tmp_path / "llm_chatmessage.py"
+    sample.write_text("def ping(x):\n    return x\n")
+
+    class RecordingLLM:
+        def __init__(self):
+            self.messages = None
+
+        def chat(self, messages):
+            self.messages = messages
+            return type(
+                "Resp",
+                (),
+                {
+                    "message": type(
+                        "Msg",
+                        (),
+                        {
+                            "content": '"""Ping value.\n\nArgs:\n    x (Any): Description of x.\nReturns:\n    Any: Description of return value.\n"""',
+                        },
+                    )(),
+                },
+            )()
+
+    llm = RecordingLLM()
+    generator = DocstringGenerator(tmp_path, backend="gemma", llm_client=llm)
+    updated = generator.run()
+
+    assert sample in updated
+    assert llm.messages and isinstance(llm.messages[0], ChatMessage)
+    assert "Ping value." in sample.read_text()

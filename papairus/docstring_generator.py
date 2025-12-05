@@ -8,6 +8,8 @@ from pathlib import Path
 from types import SimpleNamespace
 from typing import Any, Iterable, List, Optional, Sequence
 
+from llama_index.core.llms import ChatMessage, MessageRole
+
 
 @dataclass
 class ParameterDoc:
@@ -362,7 +364,8 @@ class DocstringGenerator:
         if not callable(chat_method):
             raise ValueError("llm_client must be callable or expose a chat(messages) method")
 
-        response = chat_method([SimpleNamespace(content=prompt)])
+        messages = [ChatMessage(role=MessageRole.USER, content=prompt)]
+        response = chat_method(messages)
         message = getattr(response, "message", response)
         content = getattr(message, "content", None)
         if content is None:
