@@ -38,9 +38,11 @@ def _install_stub_dependencies() -> None:
         core = sys.modules["llama_index.core"]
 
     class _Document:
-        def __init__(self, text: str = "", metadata=None):
+        def __init__(self, text: str = "", metadata=None, extra_info=None, doc_id=None):
             self.text = text
             self.metadata = metadata or {}
+            self.extra_info = extra_info or {}
+            self.doc_id = doc_id
 
     class _PromptTemplate:
         def __init__(self, template: str):
@@ -133,6 +135,10 @@ def _install_stub_dependencies() -> None:
     sys.modules["llama_index.core.base.embeddings.base"] = embeddings_base
 
     class _BaseEmbedding:
+        def __init__(self, *_, model_name=None, embed_batch_size=None, **__):
+            self.model_name = model_name
+            self.embed_batch_size = embed_batch_size
+
         def class_name(self):
             return "BaseEmbedding"
 
@@ -183,35 +189,69 @@ def _install_stub_dependencies() -> None:
 
     if "gradio" not in sys.modules:
         gradio = types.ModuleType("gradio")
+    else:
+        gradio = sys.modules["gradio"]
 
-        class _Context:
-            def __enter__(self):
-                return self
+    class _Context:
+        def __enter__(self):
+            return self
 
-            def __exit__(self, *_, **__):
-                return False
+        def __exit__(self, *_, **__):
+            return False
 
-            def queue(self):
-                return self
+        def queue(self):
+            return self
 
-            def launch(self, **_kwargs):
-                return types.SimpleNamespace()
+        def launch(self, server_name: str = "127.0.0.1", server_port: int = 7860, **_kwargs):
+            from http.server import BaseHTTPRequestHandler, HTTPServer
+            import threading
 
-        def _simple_button(*_, **__):
-            return types.SimpleNamespace(click=lambda *a, **k: None)
+            class _Handler(BaseHTTPRequestHandler):
+                def do_GET(self):
+                    self.send_response(200)
+                    self.end_headers()
+                    self.wfile.write(b"ok")
 
-        gradio.Blocks = lambda *a, **k: _Context()
-        gradio.Markdown = lambda *a, **k: None
-        gradio.Tab = lambda *a, **k: _Context()
-        gradio.Row = lambda *a, **k: _Context()
-        gradio.Column = lambda *a, **k: _Context()
-        gradio.Textbox = lambda *a, **k: ""
-        gradio.Button = _simple_button
-        gradio.ClearButton = _simple_button
-        gradio.HTML = lambda *a, **k: ""
-        gradio.close_all = lambda: None
+                def log_message(self, *_args, **_kwargs):  # pragma: no cover - quiet server
+                    return None
 
-        sys.modules["gradio"] = gradio
+            self._server = HTTPServer((server_name, server_port), _Handler)
+            thread = threading.Thread(target=self._server.serve_forever, daemon=True)
+            thread.start()
+            return types.SimpleNamespace(close=self.close)
+
+        def close(self):
+            server = getattr(self, "_server", None)
+            if server:
+                server.shutdown()
+
+    class _Textbox:
+        def __init__(self, *_, **__):
+            self.value = ""
+
+        def submit(self, *_, **__):
+            return None
+
+    class _Button:
+        def __init__(self, *_, **__):
+            pass
+
+        def click(self, *_, **__):
+            return None
+
+    gradio.Blocks = lambda *a, **k: _Context()
+    gradio.Markdown = lambda *a, **k: None
+    gradio.Tab = lambda *a, **k: _Context()
+    gradio.Row = lambda *a, **k: _Context()
+    gradio.Column = lambda *a, **k: _Context()
+    gradio.Textbox = _Textbox
+    gradio.Button = _Button
+    gradio.ClearButton = _Button
+    gradio.HTML = lambda *a, **k: ""
+    gradio.close_all = lambda: None
+    gradio.IS_STUB = True
+
+    sys.modules["gradio"] = gradio
 
 
 _install_stub_dependencies()

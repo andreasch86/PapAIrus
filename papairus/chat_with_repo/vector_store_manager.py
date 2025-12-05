@@ -165,7 +165,11 @@ class _ChunkingEmbeddingWrapper(BaseEmbedding):
         base_url = getattr(embed_model, "base_url", None)
         object.__setattr__(self, "base_url", base_url)
 
-        super().__init__(model_name=model_name, embed_batch_size=max_batch_size)
+        try:
+            super().__init__(model_name=model_name, embed_batch_size=max_batch_size)
+        except TypeError:
+            # Stubbed BaseEmbedding in tests may not accept keyword arguments.
+            super().__init__()
 
         # Re-assign after BaseEmbedding init to avoid any BaseModel attribute handling
         # from stripping the internal reference.
@@ -205,6 +209,18 @@ class _ChunkingEmbeddingWrapper(BaseEmbedding):
 
         return await asyncio.to_thread(self._get_query_embedding, query)
 
+    async def aget_query_embedding(self, query: str):
+        return await self._aget_query_embedding(query)
+
+    def get_text_embedding(self, text: str):
+        return self._get_text_embedding(text)
+
+    def get_text_embedding_batch(self, texts):
+        return self._get_text_embeddings(texts)
+
+    def get_query_embedding(self, query: str):
+        return self._get_query_embedding(query)
+
     def _get_text_embeddings(self, texts):
         wrapped = object.__getattribute__(self, "_wrapped_embed_model")
 
@@ -216,9 +232,12 @@ class _ChunkingEmbeddingWrapper(BaseEmbedding):
                 try:
                     batch_embeddings = wrapped.get_text_embedding_batch(batch)
                     source = "wrapped"
-                except Exception:
-                    batch_embeddings = self._embed_batch_via_http(batch)
-                    source = "http"
+                except Exception as exc:
+                    try:
+                        batch_embeddings = self._embed_batch_via_http(batch)
+                        source = "http"
+                    except Exception as http_exc:
+                        raise EmbeddingServiceError(str(http_exc)) from http_exc
 
                 if not batch_embeddings or len(batch_embeddings) != len(batch):
                     if source != "http":
