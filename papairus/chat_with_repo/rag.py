@@ -113,12 +113,21 @@ class RepoAssistant:
         ]
         logger.debug(f"Generated queries: {prompt_queries}")
 
+        if not prompt_queries:
+            logger.debug("No generated queries; defaulting to the user message for search.")
+            prompt_queries = [str(message)]
+
         all_results = []
 
         # Step 3: Query the VectorStoreManager for each query
         for query in prompt_queries:
-            logger.debug(f"Querying vector store with: {query}")
-            query_results = self.vector_store_manager.query_store(query)
+            cleaned_query = query.strip()
+            if not cleaned_query:
+                logger.debug("Skipping empty query before vector search.")
+                continue
+
+            logger.debug(f"Querying vector store with: {cleaned_query}")
+            query_results = self.vector_store_manager.query_store(cleaned_query)
             logger.debug(f"Results for query '{query}': {query_results}")
             all_results.extend(query_results)
 
@@ -159,7 +168,7 @@ class RepoAssistant:
 
         # Step 8: Merge and deduplicate results
         codex = list(dict.fromkeys(codez + codey))
-        md = list(dict.fromkeys(mdz + mdy))
+        md = list(dict.fromkeys(tuple(item) if isinstance(item, list) else item for item in mdz + mdy))
         unique_mdx = list(set([item for sublist in md for item in sublist]))
         uni_codex = list(dict.fromkeys(codex))
         uni_md = list(dict.fromkeys(unique_mdx))

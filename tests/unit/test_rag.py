@@ -182,3 +182,24 @@ def test_respond_skips_empty_queries_and_returns_strings(monkeypatch, patch_depe
 
     assert seen_queries == ["q1"]
     assert isinstance(result[3], str)
+
+
+def test_respond_falls_back_to_message_when_no_queries(monkeypatch, patch_dependencies, tmp_path):
+    settings = ChatCompletionSettings(model="gemma-local")
+    assistant = rag_module.RepoAssistant(settings, tmp_path / "db.json")
+
+    seen_queries: list[str] = []
+
+    monkeypatch.setattr(assistant, "generate_queries", lambda *_: [])
+    monkeypatch.setattr(assistant, "rag", lambda *_: "ragged")
+    monkeypatch.setattr(assistant, "rag_ar", lambda *_: "final")
+    monkeypatch.setattr(assistant, "rerank", lambda _query, docs: list(docs))
+    monkeypatch.setattr(
+        assistant.vector_store_manager,
+        "query_store",
+        lambda query: seen_queries.append(query) or [],
+    )
+
+    assistant.respond("question", "instruction")
+
+    assert seen_queries == ["question"]

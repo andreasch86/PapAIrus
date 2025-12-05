@@ -4,6 +4,8 @@ from typing import Iterator
 
 import pytest
 import requests
+
+pytest.importorskip("gradio")
 from gradio_client import Client
 
 from papairus.chat_with_repo.gradio_interface import GradioInterface
