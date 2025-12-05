@@ -215,7 +215,10 @@ class _ChunkingEmbeddingWrapper(BaseEmbedding):
     def get_text_embedding(self, text: str):
         return self._get_text_embedding(text)
 
-    def get_text_embedding_batch(self, texts):
+    def get_text_embedding_batch(self, texts, show_progress: bool | None = None, **kwargs):
+        # LlamaIndex passes a `show_progress` flag; ignore it for compatibility with
+        # embedding clients that do not accept the parameter.
+        _ = show_progress, kwargs
         return self._get_text_embeddings(texts)
 
     def get_query_embedding(self, query: str):
