@@ -107,6 +107,27 @@ def test_generate_queries_uses_llm(patch_dependencies, tmp_path):
     assert queries == ["q1", "q2"]
 
 
+def test_generate_queries_strips_formatting(monkeypatch, patch_dependencies, tmp_path):
+    settings = ChatCompletionSettings(model="gemma-local")
+    assistant = rag_module.RepoAssistant(settings, tmp_path / "db.json")
+
+    monkeypatch.setattr(
+        assistant.weak_model,
+        "complete",
+        lambda *_: types.SimpleNamespace(
+            text=(
+                "Sure, here are the two search queries you requested:\n\n"
+                "**Query 1:**\n\n``""`\nSystem: What is this repo?\n``""`\n\n"
+                "**Query 2:**\n\n``""`\nSystem: How does it work?\n``""`"
+            )
+        ),
+    )
+
+    queries = assistant.generate_queries("ask?", num_queries=3)
+
+    assert queries == ["System: What is this repo?", "System: How does it work?"]
+
+
 def test_rerank_sorts_documents(monkeypatch, patch_dependencies, tmp_path):
     settings = ChatCompletionSettings(model="gemma-local")
     assistant = rag_module.RepoAssistant(settings, tmp_path / "db.json")
@@ -115,6 +136,19 @@ def test_rerank_sorts_documents(monkeypatch, patch_dependencies, tmp_path):
     results = assistant.rerank("query", docs)
 
     assert results == ["doc-2", "doc-1"]
+
+
+def test_rerank_gracefully_handles_invalid_json(monkeypatch, patch_dependencies, tmp_path):
+    settings = ChatCompletionSettings(model="gemma-local")
+    assistant = rag_module.RepoAssistant(settings, tmp_path / "db.json")
+
+    # Force an invalid response payload from the LLM chat call
+    assistant.weak_model.chat_responses = [""]
+
+    docs = ["doc-a", "doc-b", "doc-c"]
+    results = assistant.rerank("query", docs)
+
+    assert results == docs[:5]
 
 
 def test_rag_and_rag_ar_delegate_to_llms(patch_dependencies, tmp_path):
@@ -139,3 +173,58 @@ def test_respond_executes_full_flow(monkeypatch, patch_dependencies, tmp_path):
     assert result[1] == "final"
     assert "doc-q2" in result[2]
     assert "code-q2" in result[4]
+
+
+def test_respond_skips_empty_queries_and_returns_strings(monkeypatch, patch_dependencies, tmp_path):
+    settings = ChatCompletionSettings(model="gemma-local")
+    assistant = rag_module.RepoAssistant(settings, tmp_path / "db.json")
+
+    seen_queries: list[str] = []
+
+    monkeypatch.setattr(assistant, "generate_queries", lambda *_: ["", "q1", "   "])
+    monkeypatch.setattr(assistant, "rag", lambda *_: "ragged")
+    monkeypatch.setattr(assistant, "rag_ar", lambda *_: "final")
+    monkeypatch.setattr(assistant, "rerank", lambda _query, docs: list(docs))
+    monkeypatch.setattr(
+        assistant.vector_store_manager,
+        "query_store",
+        lambda query: seen_queries.append(query) or [],
+    )
+
+    result = assistant.respond("question", "instruction")
+
+    assert seen_queries == ["question", "q1"]
+    assert isinstance(result[3], str)
+
+
+def test_respond_falls_back_to_message_when_no_queries(monkeypatch, patch_dependencies, tmp_path):
+    settings = ChatCompletionSettings(model="gemma-local")
+    assistant = rag_module.RepoAssistant(settings, tmp_path / "db.json")
+
+    seen_queries: list[str] = []
+
+    monkeypatch.setattr(assistant, "generate_queries", lambda *_: [])
+    monkeypatch.setattr(assistant, "rag", lambda *_: "ragged")
+    monkeypatch.setattr(assistant, "rag_ar", lambda *_: "final")
+    monkeypatch.setattr(assistant, "rerank", lambda _query, docs: list(docs))
+    monkeypatch.setattr(
+        assistant.vector_store_manager,
+        "query_store",
+        lambda query: seen_queries.append(query) or [],
+    )
+
+    assistant.respond("question", "instruction")
+
+    assert seen_queries == ["question"]
+
+
+def test_respond_returns_fallback_when_no_results(monkeypatch, patch_dependencies, tmp_path):
+    settings = ChatCompletionSettings(model="gemma-local")
+    assistant = rag_module.RepoAssistant(settings, tmp_path / "db.json")
+
+    monkeypatch.setattr(assistant.vector_store_manager, "query_store", lambda *_: [])
+
+    result = assistant.respond("question", "instruction")
+
+    assert "could not find any relevant information" in result[1]
+    assert result[2] == ""

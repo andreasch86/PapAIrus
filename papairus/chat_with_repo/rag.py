@@ -30,8 +30,31 @@ class RepoAssistant:
     def generate_queries(self, query_str: str, num_queries: int = 4):
         fmt_prompt = query_generation_template.format(num_queries=num_queries - 1, query=query_str)
         response = self.weak_model.complete(fmt_prompt)
-        queries = response.text.split("\n")
-        return queries
+        raw_queries = response.text.split("\n") if hasattr(response, "text") else []
+        return self._sanitize_generated_queries(raw_queries)
+
+    def _sanitize_generated_queries(self, queries: list[str]):
+        cleaned_queries: list[str] = []
+        skip_prefixes = ("**query", "query", "sure,", "here are", "**", "-")
+
+        for query in queries:
+            if not isinstance(query, str):
+                continue
+
+            normalized = query.strip().strip("`").strip()
+            if not normalized:
+                continue
+
+            lowered = normalized.lower()
+            if lowered.startswith(skip_prefixes):
+                continue
+
+            cleaned_queries.append(normalized)
+
+        if not cleaned_queries:
+            logger.debug("No usable queries were generated from the model response.")
+
+        return cleaned_queries
 
     def rerank(self, query, docs):  # English
         response = self.weak_model.chat(
@@ -39,11 +62,26 @@ class RepoAssistant:
             temperature=0,
             messages=relevance_ranking_chat_template.format_messages(query=query, docs=docs),
         )
-        scores = json.loads(response.message.content)["documents"]  # type: ignore
+
+        content = getattr(getattr(response, "message", None), "content", None)
+        if not content:
+            logger.warning("Rerank response missing content; returning top docs without rerank.")
+            return list(docs)[:5]
+
+        try:
+            parsed = json.loads(content)
+            scores = parsed.get("documents", [])
+        except (json.JSONDecodeError, TypeError, AttributeError) as exc:
+            logger.warning(
+                "Failed to parse rerank response as JSON; returning top docs without rerank.",
+                exc_info=exc,
+            )
+            return list(docs)[:5]
+
         logger.debug(f"scores: {scores}")
-        sorted_data = sorted(scores, key=lambda x: x["relevance_score"], reverse=True)
-        top_5_contents = [doc["content"] for doc in sorted_data[:5]]
-        return top_5_contents
+        sorted_data = sorted(scores, key=lambda x: x.get("relevance_score", 0), reverse=True)
+        top_5_contents = [doc.get("content") for doc in sorted_data[:5] if doc.get("content")]
+        return top_5_contents or list(docs)[:5]
 
     def rag(self, query, retrieved_documents):
         rag_prompt = rag_template.format(query=query, information="\n\n".join(retrieved_documents))
@@ -80,28 +118,59 @@ class RepoAssistant:
         prompt = self.textanslys.format_chat_prompt(message, instruction)
         logger.debug(f"Formatted prompt: {prompt}")
 
-        questions = self.textanslys.keyword(prompt)
+        keyword_response = self.textanslys.keyword(prompt)
+        questions = getattr(keyword_response, "text", str(keyword_response))
         logger.debug(f"Generated keywords from prompt: {questions}")
 
         # Step 2: Generate additional queries
-        prompt_queries = self.generate_queries(prompt, 3)
-        logger.debug(f"Generated queries: {prompt_queries}")
+        generated_queries = [
+            query.strip() for query in self.generate_queries(prompt, 3) if query.strip()
+        ]
+        logger.debug(f"Generated queries: {generated_queries}")
+
+        # Always include the user's original message as the first query to anchor
+        # retrieval on the actual ask. Deduplicate while preserving order.
+        prompt_queries: list[str] = []
+        seen: set[str] = set()
+        for candidate in [str(message)] + generated_queries:
+            cleaned = candidate.strip()
+            if not cleaned or cleaned in seen:
+                continue
+            seen.add(cleaned)
+            prompt_queries.append(cleaned)
 
         all_results = []
 
         # Step 3: Query the VectorStoreManager for each query
         for query in prompt_queries:
-            logger.debug(f"Querying vector store with: {query}")
-            query_results = self.vector_store_manager.query_store(query)
+            cleaned_query = query.strip()
+            if not cleaned_query:
+                logger.debug("Skipping empty query before vector search.")
+                continue
+
+            logger.debug(f"Querying vector store with: {cleaned_query}")
+            query_results = self.vector_store_manager.query_store(cleaned_query)
             logger.debug(f"Results for query '{query}': {query_results}")
             all_results.extend(query_results)
+
+        if not all_results:
+            fallback = (
+                "I could not find any relevant information in the repository for this question. "
+                "Please try rephrasing or ask about a specific file or function."
+            )
+            logger.debug("No vector search results found; returning fallback response.")
+            return message, fallback, "", str(questions), "", ""
 
         # Step 4: Deduplicate results by content
         unique_results = {result["text"]: result for result in all_results}.values()
         unique_documents = [result["text"] for result in unique_results]
         logger.debug(f"Unique documents: {unique_documents}")
 
-        unique_code = [result.get("metadata", {}).get("code_content") for result in unique_results]
+        unique_code = [
+            result.get("metadata", {}).get("code_content")
+            for result in unique_results
+            if result.get("metadata", {}).get("code_content")
+        ]
         logger.debug(f"Unique code content: {unique_code}")
 
         # Step 5: Rerank documents based on relevance
@@ -133,10 +202,22 @@ class RepoAssistant:
 
         # Step 8: Merge and deduplicate results
         codex = list(dict.fromkeys(codez + codey))
-        md = list(dict.fromkeys(mdz + mdy))
-        unique_mdx = list(set([item for sublist in md for item in sublist]))
+        md = list(
+            dict.fromkeys(tuple(item) if isinstance(item, list) else item for item in mdz + mdy)
+        )
+
+        flattened_md: list[str] = []
+        for item in md:
+            if isinstance(item, list):
+                flattened_md.extend([str(val) for val in item if val])
+            elif isinstance(item, tuple):
+                flattened_md.extend([str(val) for val in item if val])
+            elif isinstance(item, str):
+                if item:
+                    flattened_md.append(item)
+
         uni_codex = list(dict.fromkeys(codex))
-        uni_md = list(dict.fromkeys(unique_mdx))
+        uni_md = list(dict.fromkeys(flattened_md))
 
         # Convert to Markdown format
         codex_md = self.textanslys.list_to_markdown(uni_codex)

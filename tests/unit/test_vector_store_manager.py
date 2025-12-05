@@ -1239,6 +1239,22 @@ def test_chunking_wrapper_rejects_mismatched_batch_length():
         wrapped.get_text_embedding_batch(["a", "b"])
 
 
+def test_chunking_wrapper_ignores_show_progress_kwarg():
+    from papairus.chat_with_repo.vector_store_manager import _ChunkingEmbeddingWrapper
+
+    class BatchOnly:
+        model_name = "nomic-embed-text"
+
+        def get_text_embedding_batch(self, texts):
+            return [[float(idx)] for idx, _ in enumerate(texts)]
+
+    wrapped = _ChunkingEmbeddingWrapper(BatchOnly(), max_batch_size=2)
+
+    embeddings = wrapped.get_text_embedding_batch(["a", "b"], show_progress=False)
+
+    assert embeddings == [[0.0], [1.0]]
+
+
 def test_chunking_wrapper_http_branch_raises_on_empty(monkeypatch):
     from papairus.chat_with_repo.vector_store_manager import _ChunkingEmbeddingWrapper
 
