@@ -193,7 +193,7 @@ def test_respond_skips_empty_queries_and_returns_strings(monkeypatch, patch_depe
 
     result = assistant.respond("question", "instruction")
 
-    assert seen_queries == ["q1"]
+    assert seen_queries == ["question", "q1"]
     assert isinstance(result[3], str)
 
 
@@ -216,3 +216,15 @@ def test_respond_falls_back_to_message_when_no_queries(monkeypatch, patch_depend
     assistant.respond("question", "instruction")
 
     assert seen_queries == ["question"]
+
+
+def test_respond_returns_fallback_when_no_results(monkeypatch, patch_dependencies, tmp_path):
+    settings = ChatCompletionSettings(model="gemma-local")
+    assistant = rag_module.RepoAssistant(settings, tmp_path / "db.json")
+
+    monkeypatch.setattr(assistant.vector_store_manager, "query_store", lambda *_: [])
+
+    result = assistant.respond("question", "instruction")
+
+    assert "could not find any relevant information" in result[1]
+    assert result[2] == ""

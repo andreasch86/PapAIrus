@@ -123,14 +123,21 @@ class RepoAssistant:
         logger.debug(f"Generated keywords from prompt: {questions}")
 
         # Step 2: Generate additional queries
-        prompt_queries = [
+        generated_queries = [
             query.strip() for query in self.generate_queries(prompt, 3) if query.strip()
         ]
-        logger.debug(f"Generated queries: {prompt_queries}")
+        logger.debug(f"Generated queries: {generated_queries}")
 
-        if not prompt_queries:
-            logger.debug("No generated queries; defaulting to the user message for search.")
-            prompt_queries = [str(message)]
+        # Always include the user's original message as the first query to anchor
+        # retrieval on the actual ask. Deduplicate while preserving order.
+        prompt_queries: list[str] = []
+        seen: set[str] = set()
+        for candidate in [str(message)] + generated_queries:
+            cleaned = candidate.strip()
+            if not cleaned or cleaned in seen:
+                continue
+            seen.add(cleaned)
+            prompt_queries.append(cleaned)
 
         all_results = []
 
@@ -145,6 +152,14 @@ class RepoAssistant:
             query_results = self.vector_store_manager.query_store(cleaned_query)
             logger.debug(f"Results for query '{query}': {query_results}")
             all_results.extend(query_results)
+
+        if not all_results:
+            fallback = (
+                "I could not find any relevant information in the repository for this question. "
+                "Please try rephrasing or ask about a specific file or function."
+            )
+            logger.debug("No vector search results found; returning fallback response.")
+            return message, fallback, "", str(questions), "", ""
 
         # Step 4: Deduplicate results by content
         unique_results = {result["text"]: result for result in all_results}.values()
@@ -187,10 +202,22 @@ class RepoAssistant:
 
         # Step 8: Merge and deduplicate results
         codex = list(dict.fromkeys(codez + codey))
-        md = list(dict.fromkeys(tuple(item) if isinstance(item, list) else item for item in mdz + mdy))
-        unique_mdx = list(set([item for sublist in md for item in sublist]))
+        md = list(
+            dict.fromkeys(tuple(item) if isinstance(item, list) else item for item in mdz + mdy)
+        )
+
+        flattened_md: list[str] = []
+        for item in md:
+            if isinstance(item, list):
+                flattened_md.extend([str(val) for val in item if val])
+            elif isinstance(item, tuple):
+                flattened_md.extend([str(val) for val in item if val])
+            elif isinstance(item, str):
+                if item:
+                    flattened_md.append(item)
+
         uni_codex = list(dict.fromkeys(codex))
-        uni_md = list(dict.fromkeys(unique_mdx))
+        uni_md = list(dict.fromkeys(flattened_md))
 
         # Convert to Markdown format
         codex_md = self.textanslys.list_to_markdown(uni_codex)

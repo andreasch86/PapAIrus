@@ -91,6 +91,7 @@ def test_respond_uses_clean_queries_and_skips_blanks(assistant):
 
     assert response[1] == "final"
     assert assistant.vector_store_manager.queries == [
+        "question",
         "System: What is the purpose of this repository?",
         "System: How does it work?",
     ]
