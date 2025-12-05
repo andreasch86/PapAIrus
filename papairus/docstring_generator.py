@@ -46,8 +46,7 @@ class DocstringGenerator:
     ) -> None:
         self.root = Path(root)
         self.excluded_directories = set(
-            excluded_directories
-            or {".git", "env", "venv", ".venv", "__pycache__", "node_modules"}
+            excluded_directories or {".git", "env", "venv", ".venv", "__pycache__", "node_modules"}
         )
         self.backend = backend.lower()
         if self.backend not in {"ast", "gemini", "gemma", "llm"}:
@@ -111,7 +110,10 @@ class DocstringGenerator:
         return True
 
     def _collect_docstring_edits(
-        self, node: ast.AST, source_lines: Sequence[str], edits: List[tuple[int, int, List[str], bool]]
+        self,
+        node: ast.AST,
+        source_lines: Sequence[str],
+        edits: List[tuple[int, int, List[str], bool]],
     ) -> None:
         """Recursively collect docstring edits for relevant nodes."""
 
@@ -121,7 +123,10 @@ class DocstringGenerator:
             self._collect_docstring_edits(child, source_lines, edits)
 
     def _maybe_add_docstring(
-        self, node: ast.AST, source_lines: Sequence[str], edits: List[tuple[int, int, List[str], bool]]
+        self,
+        node: ast.FunctionDef | ast.AsyncFunctionDef | ast.ClassDef,
+        source_lines: Sequence[str],
+        edits: List[tuple[int, int, List[str], bool]],
     ) -> None:
         existing_docstring = ast.get_docstring(node, clean=False)
         has_docstring = existing_docstring is not None
@@ -147,7 +152,7 @@ class DocstringGenerator:
 
     def _build_docstring_if_needed(
         self,
-        node: ast.AST,
+        node: ast.FunctionDef | ast.AsyncFunctionDef | ast.ClassDef,
         existing_docstring: Optional[str],
         body_indent: str,
         source_lines: Sequence[str],
@@ -183,14 +188,12 @@ class DocstringGenerator:
         ):
             return None
 
-        summary = self._existing_summary(existing_docstring) or self._summarize_name(
-            node.name
-        )
+        summary = self._existing_summary(existing_docstring) or self._summarize_name(node.name)
         return self._format_docstring(summary, parameters, return_info, body_indent)
 
     def _build_llm_docstring(
         self,
-        node: ast.AST,
+        node: ast.FunctionDef | ast.AsyncFunctionDef | ast.ClassDef,
         existing_docstring: Optional[str],
         body_indent: str,
         source_lines: Sequence[str],
@@ -213,9 +216,7 @@ class DocstringGenerator:
         if not needs_update:
             return None
 
-        prompt, snippet = self._build_llm_prompt_payload(
-            node, source_lines, existing_docstring
-        )
+        prompt, snippet = self._build_llm_prompt_payload(node, source_lines, existing_docstring)
         llm_output = self._call_llm(
             code_snippet=snippet, prompt=prompt, existing_docstring=existing_docstring
         )
@@ -225,7 +226,9 @@ class DocstringGenerator:
         cleaned = self._strip_delimiters(llm_output.strip())
         return self._indent_docstring(cleaned.splitlines(), body_indent)
 
-    def _docstring_incomplete(self, docstring: str, parameters: Sequence[ParameterDoc], needs_return: bool) -> bool:
+    def _docstring_incomplete(
+        self, docstring: str, parameters: Sequence[ParameterDoc], needs_return: bool
+    ) -> bool:
         doc_lower = docstring.lower()
         missing_params = [param for param in parameters if param.name.lower() not in doc_lower]
         missing_return = needs_return and "returns:" not in doc_lower
@@ -298,8 +301,7 @@ class DocstringGenerator:
         assert isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef))
 
         returns_value = any(
-            isinstance(child, ast.Return) and child.value is not None
-            for child in ast.walk(node)
+            isinstance(child, ast.Return) and child.value is not None for child in ast.walk(node)
         ) or any(isinstance(child, (ast.Yield, ast.YieldFrom)) for child in ast.walk(node))
 
         if not returns_value:
@@ -337,9 +339,7 @@ class DocstringGenerator:
         if return_info:
             lines.append("")
             lines.append(f"{body_indent}Returns:")
-            lines.append(
-                f"{body_indent}{return_info.annotation}: {return_info.description}"
-            )
+            lines.append(f"{body_indent}{return_info.annotation}: {return_info.description}")
 
         lines.append(f'{body_indent}"""')
         return [f"{line}\n" for line in lines]
@@ -426,7 +426,9 @@ class DocstringGenerator:
         """Apply collected edits to the source lines in reverse order."""
 
         new_lines = list(source_lines)
-        for start, end, replacement, is_replacement in sorted(edits, key=lambda item: item[0], reverse=True):
+        for start, end, replacement, is_replacement in sorted(
+            edits, key=lambda item: item[0], reverse=True
+        ):
             if is_replacement:
                 new_lines[start : end + 1] = replacement
             else:

@@ -7,10 +7,10 @@ import click
 import git
 from pydantic import SecretStr, ValidationError
 
+from papairus.change_detector import ChangeDetector
 from papairus.doc_meta_info import DocItem, MetaInfo
 from papairus.docstring_generator import DocstringGenerator
 from papairus.exceptions import NoChangesWarning
-from papairus.change_detector import ChangeDetector
 from papairus.llm_provider import build_llm
 from papairus.log import logger, set_logger_level_from_config
 from papairus.runner import Runner
@@ -60,15 +60,11 @@ def _suggest_docs_refresh(repo: git.Repo, docs_path: Path, docs_folder_name: str
 
     change_detector = ChangeDetector(repo.working_tree_dir)
     staged = change_detector.get_staged_pys()
-    unstaged = [
-        diff.b_path for diff in repo.index.diff(None) if diff.b_path.endswith(".py")
-    ]
+    unstaged = [diff.b_path for diff in repo.index.diff(None) if diff.b_path.endswith(".py")]
     changed_files = set(staged.keys()) | set(unstaged)
 
     if not changed_files:
-        click.echo(
-            f"Docs directory {docs_path} already exists. No pending code changes detected."
-        )
+        click.echo(f"Docs directory {docs_path} already exists. No pending code changes detected.")
         return
 
     click.echo(
@@ -445,9 +441,7 @@ def generate_docstrings(
                 request_timeout=request_timeout,
                 gemini_base_url=gemini_base_url,
                 gemini_api_key=(
-                    SecretStr(resolved_gemini_api_key)
-                    if resolved_gemini_api_key
-                    else None
+                    SecretStr(resolved_gemini_api_key) if resolved_gemini_api_key else None
                 ),
                 ollama_base_url=ollama_base_url,
                 ollama_model=ollama_model,

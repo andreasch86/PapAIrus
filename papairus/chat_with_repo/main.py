@@ -12,9 +12,7 @@ def _select_repo_chat_settings(settings: ChatCompletionSettings) -> ChatCompleti
     if settings.model == "gemma-local":
         return settings
 
-    logger.info(
-        "chat-with-repo supports only Ollama/Gemma; overriding model to 'gemma-local'."
-    )
+    logger.info("chat-with-repo supports only Ollama/Gemma; overriding model to 'gemma-local'.")
     return settings.model_copy(update={"model": "gemma-local"})
 
 

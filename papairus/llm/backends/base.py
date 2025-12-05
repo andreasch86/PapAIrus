@@ -81,9 +81,7 @@ class LLMBackend(ABC):
             if content is None:
                 content = message.get("content") if isinstance(message, dict) else None
             if role is None:
-                role = (
-                    message.get("role") if isinstance(message, dict) else "user"
-                )
+                role = message.get("role") if isinstance(message, dict) else "user"
             if content is None or role is None:
                 raise ValueError("Each message must include role and content")
             yield ChatMessage(role=str(role), content=str(content))

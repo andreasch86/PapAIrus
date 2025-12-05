@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import time
-from typing import Any, Iterable, Sequence
+from typing import Any, Sequence
 
 import requests
 from requests import HTTPError
@@ -40,7 +40,9 @@ class LocalGemmaBackend(LLMBackend):
             " Do not add prose outside the docstring body."
         )
         if existing_docstring:
-            header += " Update the existing docstring to cover missing sections without changing intent."
+            header += (
+                " Update the existing docstring to cover missing sections without changing intent."
+            )
         prompt = "\n\n".join([header, "Code:", code_snippet])
         messages = [ChatMessage(role="user", content=prompt)]
         response = self.generate_response(messages)

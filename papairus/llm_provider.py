@@ -12,11 +12,6 @@ try:  # pragma: no cover - optional dependency
 except ImportError:  # pragma: no cover - optional dependency
     OllamaEmbedding = None  # type: ignore
 
-from typing import Optional
-
-import requests
-from requests import HTTPError
-
 from papairus.llm.backends.base import LLMBackend
 from papairus.llm.backends.gemini import GeminiBackend
 from papairus.llm.backends.local_gemma import LocalGemmaBackend
@@ -28,9 +23,7 @@ VertexGeminiLLM = GeminiBackend
 
 def _require_dependency(dep, name: str):
     if dep is None:  # pragma: no cover - runtime safeguard
-        raise ImportError(
-            f"{name} is required for the configured model but is not installed."
-        )
+        raise ImportError(f"{name} is required for the configured model but is not installed.")
     return dep
 
 
@@ -77,9 +70,7 @@ def build_embedding_model(chat_settings: ChatCompletionSettings):
     """Return an embedding model implementation aligned with the chat settings."""
     engine = _resolve_engine(chat_settings)
     if engine == "gemini":
-        gemini_embedding_cls = _require_dependency(
-            GeminiEmbedding, "llama-index-embeddings-gemini"
-        )
+        gemini_embedding_cls = _require_dependency(GeminiEmbedding, "llama-index-embeddings-gemini")
         return gemini_embedding_cls(
             model_name="models/embedding-001",
             api_key=chat_settings.gemini_api_key.get_secret_value(),  # type: ignore[union-attr]
@@ -93,7 +84,7 @@ def build_embedding_model(chat_settings: ChatCompletionSettings):
         except ImportError as exc:  # pragma: no cover - defensive runtime message
             raise ImportError(
                 "llama-index-embeddings-ollama is required for chat-with-repo. "
-                "Install it with `pip install \"llama-index-embeddings-ollama>=0.3.0\"`."
+                'Install it with `pip install "llama-index-embeddings-ollama>=0.3.0"`.'
             ) from exc
 
         return ollama_embedding_cls(

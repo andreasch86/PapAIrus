@@ -14,6 +14,7 @@ class ChatEngine:
         setting = SettingsManager.get_setting()
 
         self.llm = build_llm(setting.chat_completion)
+        self.project_manager = project_manager
 
     def build_prompt(self, doc_item: DocItem):
         """Builds and returns the system and user prompts based on the DocItem."""
@@ -87,7 +88,11 @@ class ChatEngine:
             combine_ref_situation=combine_ref_situation,
             file_path=file_path,
             project_structure_prefix=project_structure_prefix,
-            project_structure=project_manager.project_structure if hasattr(project_manager, "project_structure") else "",
+            project_structure=(
+                self.project_manager.project_structure
+                if hasattr(self.project_manager, "project_structure")
+                else ""
+            ),
             code_type_tell=code_type_tell,
             code_name=code_name,
             code_content=code_content,
