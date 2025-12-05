@@ -1,3 +1,4 @@
+import ast
 from pathlib import Path
 
 from papairus.docstring_generator import DocstringGenerator
@@ -97,6 +98,32 @@ def test_llm_backend_uses_chat_messages(tmp_path):
     assert sample in updated
     assert llm.messages and isinstance(llm.messages[0], ChatMessage)
     assert "Ping value." in sample.read_text()
+
+
+def test_llm_backend_strips_code_blocks_in_docstring(tmp_path):
+    sample = tmp_path / "llm_code_block.py"
+    sample.write_text("class Sample:\n    pass\n")
+
+    class CodeBlockLLM(LLMBackend):
+        def generate_response(self, messages):  # pragma: no cover - not used
+            return None
+
+        def generate_docstring(self, code_snippet: str, *, style: str = "google", existing_docstring=None):
+            return (
+                "```python\n"
+                "class Sample:\n"
+                '    """Sample docstring."""\n'
+                "```"
+            )
+
+    generator = DocstringGenerator(tmp_path, backend="gemma", llm_client=CodeBlockLLM())
+    updated = generator.run()
+
+    assert sample in updated
+    parsed = ast.parse(sample.read_text())
+    class_node = parsed.body[0]
+    assert isinstance(class_node, ast.ClassDef)
+    assert ast.get_docstring(class_node) == "Sample docstring."
 
 
 def test_progress_callback_reports_status(tmp_path):

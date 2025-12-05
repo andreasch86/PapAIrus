@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import ast
+import re
+import textwrap
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Callable, Iterable, List, Optional, Sequence
@@ -223,7 +225,7 @@ class DocstringGenerator:
         if not llm_output:
             return None
 
-        cleaned = self._strip_delimiters(llm_output.strip())
+        cleaned = self._normalize_llm_output(llm_output)
         return self._indent_docstring(cleaned.splitlines(), body_indent)
 
     def _docstring_incomplete(
@@ -397,13 +399,45 @@ class DocstringGenerator:
         return str(content)
 
     def _strip_delimiters(self, text: str) -> str:
+        """Remove common Markdown/code fences and string delimiters."""
+
+        text = text.strip()
+        text = re.sub(r"^```(?:\w+)?\n?", "", text)
+        text = re.sub(r"\n?```$", "", text)
         if text.startswith('"""') and text.endswith('"""'):
             return text[3:-3].strip()
         if text.startswith("'''") and text.endswith("'''"):
             return text[3:-3].strip()
-        if text.startswith("```") and text.endswith("```"):
-            return text[3:-3].strip()
         return text
+
+    def _extract_docstring_from_code(self, text: str) -> Optional[str]:
+        """Parse code/text and return the first docstring found if present."""
+
+        try:
+            tree = ast.parse(text)
+        except SyntaxError:
+            return None
+
+        root_doc = ast.get_docstring(tree)
+        if root_doc:
+            return root_doc
+
+        for node in tree.body:
+            if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)):
+                nested = ast.get_docstring(node)
+                if nested:
+                    return nested
+        return None
+
+    def _normalize_llm_output(self, llm_output: str) -> str:
+        """Extract a clean docstring body from an LLM response."""
+
+        stripped = self._strip_delimiters(llm_output)
+        parsed_docstring = self._extract_docstring_from_code(stripped)
+        if parsed_docstring:
+            return textwrap.dedent(parsed_docstring).strip()
+
+        return textwrap.dedent(stripped).strip()
 
     def _summarize_name(self, name: str) -> str:
         """Generate a short summary sentence from an identifier name."""

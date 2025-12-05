@@ -9,11 +9,11 @@ from papairus.settings import ChatCompletionSettings, SettingsManager
 def _select_repo_chat_settings(settings: ChatCompletionSettings) -> ChatCompletionSettings:
     """Ensure chat-with-repo uses the local Gemma/Ollama stack."""
 
-    if settings.model == "gemma-local":
+    if settings.model == "local-gemma":
         return settings
 
-    logger.info("chat-with-repo supports only Ollama/Gemma; overriding model to 'gemma-local'.")
-    return settings.model_copy(update={"model": "gemma-local"})
+    logger.info("chat-with-repo supports only Ollama/Gemma; overriding model to 'local-gemma'.")
+    return settings.model_copy(update={"model": "local-gemma"})
 
 
 def main():

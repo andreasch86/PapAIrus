@@ -85,7 +85,7 @@ export GEMINI_API_KEY=your_gemini_key
 papairus create-documentation --model gemini-2.5-flash --allow-main --telemetry
 
 # Local CodeGemma via Ollama
-papairus create-documentation --model gemma-local --base-url http://localhost:11434 --dry-run
+papairus create-documentation --model local-gemma --base-url http://localhost:11434 --dry-run
 ```
 Key flags:
 - `--allow-main`: acknowledge running on protected branches.

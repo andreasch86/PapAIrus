@@ -78,10 +78,10 @@ class ChatCompletionSettings(BaseSettings):
     def validate_model(cls, value: str) -> str:
         if value.startswith("gemini-"):
             return value
-        if value == "gemma-local" or value.startswith("gemma"):
-            return value
+        if value == "local-gemma" or value.startswith("local-gemma"):
+            return "local-gemma"
         raise ValueError(
-            "Model must be gemma-local (self-hosted) or a Gemini model name starting with 'gemini-'."
+            "Model must be local-gemma (self-hosted) or a Gemini model name starting with 'gemini-'."
         )
 
     @field_validator("gemini_api_key")

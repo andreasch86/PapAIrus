@@ -17,9 +17,6 @@ from papairus.llm.backends.gemini import GeminiBackend
 from papairus.llm.backends.local_gemma import LocalGemmaBackend
 from papairus.settings import ChatCompletionSettings
 
-# Backwards-compatible export for existing callers/tests
-VertexGeminiLLM = GeminiBackend
-
 
 def _require_dependency(dep, name: str):
     if dep is None:  # pragma: no cover - runtime safeguard
@@ -32,7 +29,7 @@ def _resolve_engine(settings: ChatCompletionSettings) -> str:
         return settings.engine
     if settings.model.startswith("gemini-"):
         return "gemini"
-    if settings.model in {"gemma-local", "codegemma"} or settings.model.startswith("gemma"):
+    if settings.model == "local-gemma":
         return "local_gemma"
     raise ValueError(f"Unsupported model configured: {settings.model}")
 

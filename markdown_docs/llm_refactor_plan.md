@@ -2,7 +2,7 @@
 
 ## Current Observations
 
-- `papairus/llm_provider.py` builds either a Gemini-based chat client (`VertexGeminiLLM`) or a local Gemma client through llama-index Ollama bindings, keyed off `ChatCompletionSettings.model`. The logic is centralized and tightly coupled to llama-index primitives.
+- `papairus/llm_provider.py` builds either a Gemini-based chat client (`GeminiBackend`) or a local Gemma client through llama-index Ollama bindings, keyed off `ChatCompletionSettings.model`. The logic is centralized and tightly coupled to llama-index primitives.
 - `papairus/docstring_generator.py` relies on a callable `llm_client` that exposes a `chat(messages)` method and constructs prompts inline when the backend is not the built-in AST mode.
 - `papairus/chat_engine.py` pulls an LLM via `build_llm` and formats prompts using `chat_template`, with no explicit distinction between conversational chat and docstring generation modes.
 
@@ -15,7 +15,7 @@
   - Define the `LLMBackend` ABC with chat and docstring methods and common dataclass-style configuration objects for temperature, timeouts, and model identifiers.
   - Include lightweight response objects (message content plus token usage metadata) that mirror the shapes currently expected by `ChatEngine` and `DocstringGenerator`.
 - **`papairus/llm/backends/gemini.py`** (new)
-  - Implement `GeminiBackend` using the existing `VertexGeminiLLM` logic but adapted to the new base interface.
+  - Implement `GeminiBackend` using the existing `GeminiBackend` logic but adapted to the new base interface.
   - Keep request building/response parsing isolated so tests can mock network calls without pulling in external dependencies.
 - **`papairus/llm/backends/local_gemma.py`** (new)
   - Implement `LocalGemmaBackend` targeting `llama-cpp-python` (or `langchain_community.llms.LlamaCpp`) with configurable model paths for CodeGemma 2B, 7B, and 7B Q4_K_M variants.
