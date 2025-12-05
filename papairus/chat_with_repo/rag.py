@@ -80,11 +80,14 @@ class RepoAssistant:
         prompt = self.textanslys.format_chat_prompt(message, instruction)
         logger.debug(f"Formatted prompt: {prompt}")
 
-        questions = self.textanslys.keyword(prompt)
+        keyword_response = self.textanslys.keyword(prompt)
+        questions = getattr(keyword_response, "text", str(keyword_response))
         logger.debug(f"Generated keywords from prompt: {questions}")
 
         # Step 2: Generate additional queries
-        prompt_queries = self.generate_queries(prompt, 3)
+        prompt_queries = [
+            query.strip() for query in self.generate_queries(prompt, 3) if query.strip()
+        ]
         logger.debug(f"Generated queries: {prompt_queries}")
 
         all_results = []
