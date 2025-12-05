@@ -5,7 +5,8 @@ from __future__ import annotations
 import ast
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Iterable, List, Optional, Sequence
+from types import SimpleNamespace
+from typing import Any, Iterable, List, Optional, Sequence
 
 
 @dataclass
@@ -35,12 +36,22 @@ class ReturnDoc:
 class DocstringGenerator:
     """Generate or update docstrings for Python modules in a repository."""
 
-    def __init__(self, root: Path, excluded_directories: Optional[Sequence[str]] = None) -> None:
+    def __init__(
+        self,
+        root: Path,
+        excluded_directories: Optional[Sequence[str]] = None,
+        backend: str = "ast",
+        llm_client: Optional[Any] = None,
+    ) -> None:
         self.root = Path(root)
         self.excluded_directories = set(
             excluded_directories
             or {".git", "env", "venv", ".venv", "__pycache__", "node_modules"}
         )
+        self.backend = backend.lower()
+        if self.backend not in {"ast", "gemini", "gemma"}:
+            raise ValueError("backend must be one of: ast, gemini, gemma")
+        self.llm_client = llm_client
 
     def run(self, dry_run: bool = False) -> List[Path]:
         """Generate docstrings for all Python files under ``root``.
@@ -104,7 +115,12 @@ class DocstringGenerator:
         has_docstring = existing_docstring is not None
         body_indent = " " * (getattr(node, "col_offset", 0) + 4)
 
-        docstring_lines = self._build_docstring_if_needed(node, existing_docstring, body_indent)
+        if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)) and node.name == "__init__":
+            return
+
+        docstring_lines = self._build_docstring_if_needed(
+            node, existing_docstring, body_indent, source_lines
+        )
         if docstring_lines is None:
             return
 
@@ -118,6 +134,23 @@ class DocstringGenerator:
             edits.append((first_body_line, first_body_line, docstring_lines, False))
 
     def _build_docstring_if_needed(
+        self,
+        node: ast.AST,
+        existing_docstring: Optional[str],
+        body_indent: str,
+        source_lines: Sequence[str],
+    ) -> Optional[List[str]]:
+        if self.backend == "ast":
+            return self._build_ast_docstring(node, existing_docstring, body_indent)
+
+        return self._build_llm_docstring(
+            node=node,
+            existing_docstring=existing_docstring,
+            body_indent=body_indent,
+            source_lines=source_lines,
+        )
+
+    def _build_ast_docstring(
         self, node: ast.AST, existing_docstring: Optional[str], body_indent: str
     ) -> Optional[List[str]]:
         if isinstance(node, ast.ClassDef):
@@ -133,11 +166,48 @@ class DocstringGenerator:
         return_info = self._extract_returns(node)
         needs_return = return_info is not None
 
-        if existing_docstring and not self._docstring_incomplete(existing_docstring, parameters, needs_return):
+        if existing_docstring and not self._docstring_incomplete(
+            existing_docstring, parameters, needs_return
+        ):
             return None
 
-        summary = self._existing_summary(existing_docstring) or self._summarize_name(node.name)
+        summary = self._existing_summary(existing_docstring) or self._summarize_name(
+            node.name
+        )
         return self._format_docstring(summary, parameters, return_info, body_indent)
+
+    def _build_llm_docstring(
+        self,
+        node: ast.AST,
+        existing_docstring: Optional[str],
+        body_indent: str,
+        source_lines: Sequence[str],
+    ) -> Optional[List[str]]:
+        parameters: Sequence[ParameterDoc] = []
+        return_info: Optional[ReturnDoc] = None
+
+        if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
+            parameters = self._extract_parameters(node)
+            return_info = self._extract_returns(node)
+            needs_return = return_info is not None
+            needs_update = existing_docstring is None or self._docstring_incomplete(
+                existing_docstring, parameters, needs_return
+            )
+        elif isinstance(node, ast.ClassDef):
+            needs_update = existing_docstring is None
+        else:
+            return None
+
+        if not needs_update:
+            return None
+
+        prompt = self._build_llm_prompt(node, source_lines, existing_docstring)
+        llm_output = self._call_llm(prompt)
+        if not llm_output:
+            return None
+
+        cleaned = self._strip_delimiters(llm_output.strip())
+        return self._indent_docstring(cleaned.splitlines(), body_indent)
 
     def _docstring_incomplete(self, docstring: str, parameters: Sequence[ParameterDoc], needs_return: bool) -> bool:
         doc_lower = docstring.lower()
@@ -257,6 +327,56 @@ class DocstringGenerator:
 
         lines.append(f'{body_indent}"""')
         return [f"{line}\n" for line in lines]
+
+    def _indent_docstring(self, lines: Sequence[str], body_indent: str) -> List[str]:
+        """Wrap provided lines inside triple quotes with correct indentation."""
+
+        indented = [f'{body_indent}"""\n']
+        for line in lines:
+            indented.append(f"{body_indent}{line.rstrip()}\n")
+        indented.append(f'{body_indent}"""\n')
+        return indented
+
+    def _build_llm_prompt(
+        self, node: ast.AST, source_lines: Sequence[str], existing_docstring: Optional[str]
+    ) -> str:
+        source_text = "".join(source_lines)
+        snippet = ast.get_source_segment(source_text, node) or ""
+        header = (
+            "Generate a concise Google-style Python docstring for the following "
+            "class or function. Include Args/Returns sections when appropriate."
+        )
+        if existing_docstring:
+            header += " Update the existing docstring to cover missing details."
+
+        return "\n\n".join([header, "Code:", snippet])
+
+    def _call_llm(self, prompt: str) -> str:
+        if self.llm_client is None:
+            raise ValueError("LLM backend requires an llm_client instance")
+
+        if callable(self.llm_client):
+            return str(self.llm_client(prompt))
+
+        chat_method = getattr(self.llm_client, "chat", None)
+        if not callable(chat_method):
+            raise ValueError("llm_client must be callable or expose a chat(messages) method")
+
+        response = chat_method([SimpleNamespace(content=prompt)])
+        message = getattr(response, "message", response)
+        content = getattr(message, "content", None)
+        if content is None:
+            raise ValueError("LLM response did not include content")
+        return str(content)
+
+    def _strip_delimiters(self, text: str) -> str:
+        if text.startswith('"""') and text.endswith('"""'):
+            return text[3:-3].strip()
+        if text.startswith("'''") and text.endswith("'''"):
+            return text[3:-3].strip()
+        if text.startswith("```") and text.endswith("```"):
+            return text[3:-3].strip()
+        return text
 
     def _summarize_name(self, name: str) -> str:
         """Generate a short summary sentence from an identifier name."""

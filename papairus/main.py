@@ -4,14 +4,15 @@ from pathlib import Path
 
 import click
 import git
-from pydantic import ValidationError
+from pydantic import SecretStr, ValidationError
 
 from papairus.doc_meta_info import DocItem, MetaInfo
 from papairus.docstring_generator import DocstringGenerator
 from papairus.exceptions import NoChangesWarning
+from papairus.llm_provider import build_llm
 from papairus.log import logger, set_logger_level_from_config
 from papairus.runner import Runner
-from papairus.settings import LogLevel, SettingsManager
+from papairus.settings import ChatCompletionSettings, LogLevel, SettingsManager
 from papairus.utils.meta_info_utils import delete_fake_files, make_fake_files
 
 try:
@@ -326,10 +327,93 @@ def chat_with_repo():
     default=False,
     help="Preview docstring updates without modifying files.",
 )
-def generate_docstrings(path: Path, dry_run: bool):
+@click.option(
+    "--backend",
+    type=click.Choice(["ast", "gemini", "gemma"], case_sensitive=False),
+    default="ast",
+    show_default=True,
+    help="Docstring generation engine to use.",
+)
+@click.option(
+    "--model",
+    default=None,
+    help=(
+        "Model identifier to use for LLM-based docstrings. Defaults to a Gemini"
+        " or Gemma model based on the backend."
+    ),
+)
+@click.option(
+    "--temperature",
+    default=0.2,
+    show_default=True,
+    help="Sampling temperature for the LLM backend.",
+)
+@click.option(
+    "--request-timeout",
+    default=60,
+    show_default=True,
+    help="Request timeout (seconds) for LLM docstring generation.",
+)
+@click.option(
+    "--gemini-base-url",
+    default="https://aiplatform.googleapis.com/v1",
+    show_default=True,
+    help="Base URL for Gemini API calls.",
+)
+@click.option(
+    "--gemini-api-key",
+    default=None,
+    help="API key for Gemini models.",
+)
+@click.option(
+    "--ollama-base-url",
+    default="http://localhost:11434",
+    show_default=True,
+    help="Base URL for Gemma (Ollama) models when using the Gemma backend.",
+)
+@click.option(
+    "--ollama-model",
+    default="gemma:2b",
+    show_default=True,
+    help="Ollama model name when using the Gemma backend.",
+)
+def generate_docstrings(
+    path: Path,
+    dry_run: bool,
+    backend: str,
+    model: str | None,
+    temperature: float,
+    request_timeout: int,
+    gemini_base_url: str,
+    gemini_api_key: str | None,
+    ollama_base_url: str,
+    ollama_model: str,
+):
     """Add Google-style docstrings to callables missing complete documentation."""
 
-    generator = DocstringGenerator(path)
+    backend = backend.lower()
+    llm_client = None
+
+    if backend != "ast":
+        selected_model = model
+        if selected_model is None:
+            selected_model = "gemini-2.5-flash" if backend == "gemini" else "gemma-local"
+
+        try:
+            chat_settings = ChatCompletionSettings(
+                model=selected_model,
+                temperature=temperature,
+                request_timeout=request_timeout,
+                gemini_base_url=gemini_base_url,
+                gemini_api_key=SecretStr(gemini_api_key) if gemini_api_key else None,
+                ollama_base_url=ollama_base_url,
+                ollama_model=ollama_model,
+            )
+            llm_client = build_llm(chat_settings)
+        except Exception as exc:  # pragma: no cover - defensive guard for CLI output
+            raise click.ClickException(str(exc))
+
+    generator = DocstringGenerator(path, backend=backend, llm_client=llm_client)
     updated_files = generator.run(dry_run=dry_run)
 
     if not updated_files:

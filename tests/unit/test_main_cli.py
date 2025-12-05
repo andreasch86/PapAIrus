@@ -471,6 +471,40 @@ def test_generate_docstrings_cli_dry_run(tmp_path):
     assert sample.read_text().count('"""') == 0
 
 
+def test_generate_docstrings_cli_with_llm(monkeypatch, tmp_path):
+    created = {}
+
+    class DummyGenerator:
+        def __init__(self, root, backend="ast", llm_client=None, **_):
+            created["backend"] = backend
+            created["llm_client"] = llm_client
+
+        def run(self, dry_run=False):
+            created["dry_run"] = dry_run
+            return [tmp_path / "file.py"]
+
+    monkeypatch.setattr(main, "DocstringGenerator", DummyGenerator)
+    monkeypatch.setattr(main, "build_llm", lambda settings: "llm")
+
+    runner = CliRunner()
+    result = runner.invoke(
+        main.generate_docstrings,
+        [
+            "--path",
+            str(tmp_path),
+            "--backend",
+            "gemini",
+            "--gemini-api-key",
+            "secret",
+        ],
+    )
+
+    assert result.exit_code == 0
+    assert created["backend"] == "gemini"
+    assert created["llm_client"] == "llm"
+    assert "docstrings in 1 file" in result.output
+
+
 def test_chat_with_repo_imports_fallback(monkeypatch):
     dummy_module = types.SimpleNamespace(main=lambda: None)
     attempts = {"count": 0}
