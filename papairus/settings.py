@@ -53,6 +53,7 @@ class ProjectSettings(BaseSettings):
 
 
 class ChatCompletionSettings(BaseSettings):
+    engine: Optional[str] = None
     model: str = "gemini-2.5-flash"  # Gemini (API key) or local Gemma are allowed.
     temperature: PositiveFloat = 0.2
     request_timeout: PositiveInt = 60
@@ -61,6 +62,7 @@ class ChatCompletionSettings(BaseSettings):
     ollama_base_url: str = "http://localhost:11434"
     ollama_model: str = "gemma:2b"
     ollama_embedding_model: str = "nomic-embed-text"
+    ollama_auto_pull: bool = True
 
     @field_validator("gemini_base_url", mode="before")
     @classmethod
@@ -77,7 +79,7 @@ class ChatCompletionSettings(BaseSettings):
     def validate_model(cls, value: str) -> str:
         if value.startswith("gemini-"):
             return value
-        if value == "gemma-local":
+        if value == "gemma-local" or value.startswith("gemma"):
             return value
         raise ValueError(
             "Model must be gemma-local (self-hosted) or a Gemini model name starting with 'gemini-'."
@@ -96,6 +98,7 @@ class ChatCompletionSettings(BaseSettings):
 class Setting(BaseSettings):
     project: ProjectSettings = {}  # type: ignore
     chat_completion: ChatCompletionSettings = {}  # type: ignore
+    docstring_llm: ChatCompletionSettings = {}  # type: ignore
 
 
 class SettingsManager:
@@ -144,6 +147,7 @@ class SettingsManager:
         cls._setting_instance = Setting(
             project=project_settings,
             chat_completion=chat_completion_settings,
+            docstring_llm=chat_completion_settings,
         )
 
 

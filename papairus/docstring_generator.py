@@ -5,10 +5,9 @@ from __future__ import annotations
 import ast
 from dataclasses import dataclass
 from pathlib import Path
-from types import SimpleNamespace
 from typing import Any, Callable, Iterable, List, Optional, Sequence
 
-from llama_index.core.llms import ChatMessage, MessageRole
+from papairus.llm.backends.base import ChatMessage, LLMBackend
 
 
 @dataclass
@@ -51,8 +50,8 @@ class DocstringGenerator:
             or {".git", "env", "venv", ".venv", "__pycache__", "node_modules"}
         )
         self.backend = backend.lower()
-        if self.backend not in {"ast", "gemini", "gemma"}:
-            raise ValueError("backend must be one of: ast, gemini, gemma")
+        if self.backend not in {"ast", "gemini", "gemma", "llm"}:
+            raise ValueError("backend must be one of: ast, gemini, gemma, llm")
         self.llm_client = llm_client
 
     def run(
@@ -368,6 +367,9 @@ class DocstringGenerator:
         if self.llm_client is None:
             raise ValueError("LLM backend requires an llm_client instance")
 
+        if isinstance(self.llm_client, LLMBackend):
+            return self.llm_client.generate_docstring(prompt)
+
         if callable(self.llm_client):
             return str(self.llm_client(prompt))
 
@@ -375,7 +377,7 @@ class DocstringGenerator:
         if not callable(chat_method):
             raise ValueError("llm_client must be callable or expose a chat(messages) method")
 
-        messages = [ChatMessage(role=MessageRole.USER, content=prompt)]
+        messages = [ChatMessage(role="user", content=prompt)]
         response = chat_method(messages)
         message = getattr(response, "message", response)
         content = getattr(message, "content", None)

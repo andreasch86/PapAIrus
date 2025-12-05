@@ -7,15 +7,7 @@ from papairus.llm_provider import VertexGeminiLLM, build_embedding_model, build_
 from papairus.settings import ChatCompletionSettings
 
 
-def test_build_llm_uses_ollama(monkeypatch):
-    captured_kwargs = {}
-
-    class FakeOllama:
-        def __init__(self, **kwargs):
-            captured_kwargs.update(kwargs)
-
-    monkeypatch.setattr("papairus.llm_provider.Ollama", FakeOllama)
-
+def test_build_llm_uses_local_gemma():
     settings = ChatCompletionSettings(
         model="gemma-local",
         request_timeout=45,
@@ -27,13 +19,12 @@ def test_build_llm_uses_ollama(monkeypatch):
 
     llm = build_llm(settings)
 
-    assert isinstance(llm, FakeOllama)
-    assert captured_kwargs == {
-        "model": "gemma2:2b",
-        "request_timeout": 45,
-        "temperature": 0.7,
-        "base_url": "http://ollama:11434",
-    }
+    from papairus.llm.backends.local_gemma import LocalGemmaBackend
+
+    assert isinstance(llm, LocalGemmaBackend)
+    assert llm.model == "gemma2:2b"
+    assert llm.base_url == "http://ollama:11434"
+    assert llm.temperature == 0.7
 
 
 def test_build_embedding_model_for_gemma(monkeypatch):

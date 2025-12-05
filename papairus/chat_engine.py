@@ -1,7 +1,7 @@
 from papairus.doc_meta_info import DocItem
 from papairus.llm_provider import build_llm
 from papairus.log import logger
-from papairus.prompt import chat_template
+from papairus.prompt import build_repo_documentation_messages
 from papairus.settings import SettingsManager
 
 
@@ -83,10 +83,11 @@ class ChatEngine:
 
         project_structure_prefix = ", and the related hierarchical structure of this project is as follows (The current object is marked with an *):"
 
-        return chat_template.format_messages(
+        return build_repo_documentation_messages(
             combine_ref_situation=combine_ref_situation,
             file_path=file_path,
             project_structure_prefix=project_structure_prefix,
+            project_structure=project_manager.project_structure if hasattr(project_manager, "project_structure") else "",
             code_type_tell=code_type_tell,
             code_name=code_name,
             code_content=code_content,
@@ -103,7 +104,7 @@ class ChatEngine:
         messages = self.build_prompt(doc_item)
 
         try:
-            response = self.llm.chat(messages)
+            response = self.llm.generate_response(messages)
             logger.debug(f"LLM Prompt Tokens: {response.raw.usage.prompt_tokens}")  # type: ignore
             logger.debug(
                 f"LLM Completion Tokens: {response.raw.usage.completion_tokens}"  # type: ignore

@@ -1,8 +1,7 @@
 from pathlib import Path
 
-from llama_index.core.llms import ChatMessage
-
 from papairus.docstring_generator import DocstringGenerator
+from papairus.llm.backends.base import ChatMessage, LLMBackend
 
 
 def test_adds_missing_docstring(tmp_path):
@@ -59,9 +58,12 @@ def test_llm_backend_uses_client(tmp_path):
     sample = tmp_path / "llm_sample.py"
     sample.write_text("def shout(text):\n    return text.upper()\n")
 
-    class FakeLLM:
-        def chat(self, messages):
-            return type("Resp", (), {"message": type("Msg", (), {"content": '"""Shout text.\n\nArgs:\n    text (str): Input.\nReturns:\n    str: Uppercase.\n"""'})()})()
+    class FakeLLM(LLMBackend):
+        def generate_response(self, messages):
+            return None  # pragma: no cover - not used in this test
+
+        def generate_docstring(self, code_snippet: str, *, style: str = "google", existing_docstring=None):
+            return """Shout text.\n\nArgs:\n    text (str): Input.\nReturns:\n    str: Uppercase.\n"""
 
     generator = DocstringGenerator(tmp_path, backend="gemini", llm_client=FakeLLM())
     updated = generator.run()
@@ -76,25 +78,17 @@ def test_llm_backend_uses_chat_messages(tmp_path):
     sample = tmp_path / "llm_chatmessage.py"
     sample.write_text("def ping(x):\n    return x\n")
 
-    class RecordingLLM:
+    class RecordingLLM(LLMBackend):
         def __init__(self):
             self.messages = None
 
-        def chat(self, messages):
+        def generate_response(self, messages):  # pragma: no cover - docstring path only
             self.messages = messages
-            return type(
-                "Resp",
-                (),
-                {
-                    "message": type(
-                        "Msg",
-                        (),
-                        {
-                            "content": '"""Ping value.\n\nArgs:\n    x (Any): Description of x.\nReturns:\n    Any: Description of return value.\n"""',
-                        },
-                    )(),
-                },
-            )()
+            return None
+
+        def generate_docstring(self, code_snippet: str, *, style: str = "google", existing_docstring=None):
+            self.messages = [ChatMessage(role="user", content=code_snippet)]
+            return '"""Ping value.\n\nArgs:\n    x (Any): Description of x.\nReturns:\n    Any: Description of return value.\n"""'
 
     llm = RecordingLLM()
     generator = DocstringGenerator(tmp_path, backend="gemma", llm_client=llm)
