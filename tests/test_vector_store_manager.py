@@ -595,6 +595,220 @@ def test_chunking_wrapper_raises_when_missing_embedding_apis():
         wrapped.get_text_embedding_batch(["x"])
 
 
+def test_chunking_wrapper_http_fallback(monkeypatch):
+    from papairus.chat_with_repo.vector_store_manager import (
+        _wrap_chunking_embed_model,
+    )
+
+    class FailingEmbed:
+        base_url = "http://localhost:11434"
+        model_name = "nomic-embed-text"
+
+        def get_text_embedding(self, _text):
+            raise FakeResponseError("embed failed", status_code=500)
+
+    def fake_post(url, json, timeout):
+        assert url.endswith("/api/embeddings")
+        assert json["model"] == "nomic-embed-text"
+        class Response:
+            def raise_for_status(self):
+                return None
+
+            def json(self):
+                return {"embedding": [0.1, 0.2]}
+
+        return Response()
+
+    monkeypatch.setattr(
+        "papairus.chat_with_repo.vector_store_manager.requests.post", fake_post
+    )
+
+    wrapped = _wrap_chunking_embed_model(FailingEmbed())
+
+    assert wrapped.get_text_embedding("hello") == [0.1, 0.2]
+    assert wrapped.get_text_embedding_batch(["hello", "world"]) == [
+        [0.1, 0.2],
+        [0.1, 0.2],
+    ]
+
+
+def test_chunking_wrapper_http_fallback_for_batch(monkeypatch):
+    from papairus.chat_with_repo.vector_store_manager import (
+        _wrap_chunking_embed_model,
+    )
+
+    class BatchFailureEmbed:
+        base_url = "http://localhost:11434"
+        model_name = "nomic-embed-text"
+
+        def get_text_embedding_batch(self, _texts):
+            raise FakeResponseError("batch failed", status_code=500)
+
+    def fake_post(url, json, timeout):
+        assert url.endswith("/api/embeddings")
+        assert json["model"] == "nomic-embed-text"
+
+        class Response:
+            def raise_for_status(self):
+                return None
+
+            def json(self):
+                return {"data": [{"embedding": [0.3, 0.4]}]}
+
+        return Response()
+
+    monkeypatch.setattr(
+        "papairus.chat_with_repo.vector_store_manager.requests.post", fake_post
+    )
+
+    wrapped = _wrap_chunking_embed_model(BatchFailureEmbed())
+
+    assert wrapped.get_text_embedding_batch(["a", "b"]) == [[0.3, 0.4], [0.3, 0.4]]
+
+
+def test_embed_via_http_requires_base_url(monkeypatch):
+    from papairus.chat_with_repo.vector_store_manager import _ChunkingEmbeddingWrapper
+
+    wrapper = _ChunkingEmbeddingWrapper(object(), max_batch_size=1)
+
+    with pytest.raises(EmbeddingServiceError):
+        wrapper._embed_via_http("text")
+
+
+def test_embed_via_http_raises_on_bad_payload(monkeypatch):
+    from papairus.chat_with_repo.vector_store_manager import _ChunkingEmbeddingWrapper
+
+    class BareEmbed:
+        base_url = "http://localhost:11434"
+        model_name = "nomic-embed-text"
+
+    def fake_post(url, json, timeout):
+        class Response:
+            def raise_for_status(self):
+                return None
+
+            def json(self):
+                return {"unexpected": True}
+
+        return Response()
+
+    monkeypatch.setattr(
+        "papairus.chat_with_repo.vector_store_manager.requests.post", fake_post
+    )
+
+    wrapper = _ChunkingEmbeddingWrapper(BareEmbed(), max_batch_size=1)
+
+    with pytest.raises(EmbeddingServiceError):
+        wrapper._embed_via_http("text")
+
+
+def test_embed_via_http_supports_embeddings_key(monkeypatch):
+    from papairus.chat_with_repo.vector_store_manager import _ChunkingEmbeddingWrapper
+
+    class BareEmbed:
+        base_url = "http://localhost:11434"
+        model_name = "nomic-embed-text"
+
+    def fake_post(url, json, timeout):
+        class Response:
+            def raise_for_status(self):
+                return None
+
+            def json(self):
+                return {"embeddings": [[0.9, 1.0]]}
+
+        return Response()
+
+    monkeypatch.setattr(
+        "papairus.chat_with_repo.vector_store_manager.requests.post", fake_post
+    )
+
+    wrapper = _ChunkingEmbeddingWrapper(BareEmbed(), max_batch_size=1)
+
+    assert wrapper._embed_via_http("text") == [0.9, 1.0]
+
+
+def test_embed_via_http_handles_non_dict(monkeypatch):
+    from papairus.chat_with_repo.vector_store_manager import _ChunkingEmbeddingWrapper
+
+    class BareEmbed:
+        base_url = "http://localhost:11434"
+        model_name = "nomic-embed-text"
+
+    def fake_post(url, json, timeout):
+        class Response:
+            def raise_for_status(self):
+                return None
+
+            def json(self):
+                return [1, 2, 3]
+
+        return Response()
+
+    monkeypatch.setattr(
+        "papairus.chat_with_repo.vector_store_manager.requests.post", fake_post
+    )
+
+    wrapper = _ChunkingEmbeddingWrapper(BareEmbed(), max_batch_size=1)
+
+    with pytest.raises(EmbeddingServiceError):
+        wrapper._embed_via_http("text")
+
+
+def test_embed_via_http_rejects_bad_embeddings_payload(monkeypatch):
+    from papairus.chat_with_repo.vector_store_manager import _ChunkingEmbeddingWrapper
+
+    class BareEmbed:
+        base_url = "http://localhost:11434"
+        model_name = "nomic-embed-text"
+
+    def fake_post(url, json, timeout):
+        class Response:
+            def raise_for_status(self):
+                return None
+
+            def json(self):
+                return {"embeddings": ["oops"]}
+
+        return Response()
+
+    monkeypatch.setattr(
+        "papairus.chat_with_repo.vector_store_manager.requests.post", fake_post
+    )
+
+    wrapper = _ChunkingEmbeddingWrapper(BareEmbed(), max_batch_size=1)
+
+    with pytest.raises(EmbeddingServiceError):
+        wrapper._embed_via_http("text")
+
+
+def test_embed_via_http_requires_embedding_in_data(monkeypatch):
+    from papairus.chat_with_repo.vector_store_manager import _ChunkingEmbeddingWrapper
+
+    class BareEmbed:
+        base_url = "http://localhost:11434"
+        model_name = "nomic-embed-text"
+
+    def fake_post(url, json, timeout):
+        class Response:
+            def raise_for_status(self):
+                return None
+
+            def json(self):
+                return {"data": [{"missing": True}]}
+
+        return Response()
+
+    monkeypatch.setattr(
+        "papairus.chat_with_repo.vector_store_manager.requests.post", fake_post
+    )
+
+    wrapper = _ChunkingEmbeddingWrapper(BareEmbed(), max_batch_size=1)
+
+    with pytest.raises(EmbeddingServiceError):
+        wrapper._embed_via_http("text")
+
+
 def test_chunking_wrapper_get_text_embedding_missing_method():
     from papairus.chat_with_repo.vector_store_manager import (
         _wrap_chunking_embed_model,

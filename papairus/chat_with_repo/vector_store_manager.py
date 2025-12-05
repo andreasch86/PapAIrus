@@ -32,7 +32,7 @@ def _extract_doc_text(doc: Document) -> str:
 
 
 _DEFAULT_EMBED_BATCH_SIZE = 32
-_MAX_EMBED_CHARS = 4096
+_MAX_EMBED_CHARS = 2048
 
 
 def _raise_embedding_model_error(exc: Exception, embed_model) -> None:
@@ -138,8 +138,14 @@ class _ChunkingEmbeddingWrapper(BaseEmbedding):
     def _get_text_embedding(self, text: str):
         wrapped = object.__getattribute__(self, "_wrapped_embed_model")
 
-        if hasattr(wrapped, "get_text_embedding"):
-            return wrapped.get_text_embedding(text)
+        try:
+            if hasattr(wrapped, "get_text_embedding"):
+                return wrapped.get_text_embedding(text)
+        except Exception:
+            # Fall back to the HTTP embeddings endpoint when the wrapped model fails
+            # (e.g., incompatible client or API change).
+            return self._embed_via_http(text)
+
         raise AttributeError("Underlying embed model does not support embedding APIs")
 
     def _get_query_embedding(self, query: str):
@@ -158,11 +164,14 @@ class _ChunkingEmbeddingWrapper(BaseEmbedding):
             text_list = list(texts)
             for start in range(0, len(text_list), self._max_batch_size):
                 batch = text_list[start : start + self._max_batch_size]
-                embeddings.extend(wrapped.get_text_embedding_batch(batch))
+                try:
+                    embeddings.extend(wrapped.get_text_embedding_batch(batch))
+                except Exception:
+                    embeddings.extend(self._embed_batch_via_http(batch))
             return embeddings
 
         if hasattr(wrapped, "get_text_embedding"):
-            return [wrapped.get_text_embedding(text) for text in texts]
+            return [self._get_text_embedding(text) for text in texts]
 
         raise AttributeError("Underlying embed model does not support embedding APIs")
 
@@ -173,6 +182,47 @@ class _ChunkingEmbeddingWrapper(BaseEmbedding):
 
         wrapped = object.__getattribute__(self, "_wrapped_embed_model")
         return getattr(wrapped, name)
+
+    # HTTP fallback helpers -------------------------------------------------
+
+    def _embed_via_http(self, text: str):
+        base_url = getattr(self, "base_url", None)
+        model_name = getattr(self, "model_name", None) or getattr(self, "model", None)
+
+        if not base_url or not model_name:
+            raise EmbeddingServiceError(
+                "Embedding request failed because base URL or model name was not configured."
+            )
+
+        response = requests.post(
+            f"{base_url}/api/embeddings",
+            json={"model": model_name, "prompt": text},
+            timeout=60,
+        )
+        response.raise_for_status()
+        payload = response.json()
+
+        if isinstance(payload, dict):
+            if "embedding" in payload:
+                return payload["embedding"]
+            elif payload.get("data"):
+                first = payload["data"][0]
+                if isinstance(first, dict) and "embedding" in first:
+                    return first["embedding"]
+            elif payload.get("embeddings"):
+                first = payload["embeddings"][0]
+                if isinstance(first, (list, tuple)):
+                    return list(first)
+
+        raise EmbeddingServiceError(
+            "Embedding request to {url} failed for model '{model}'. "
+            "Ensure the Ollama daemon is reachable and the embedding model is healthy.".format(
+                url=base_url, model=model_name
+            )
+        )
+
+    def _embed_batch_via_http(self, texts):
+        return [self._embed_via_http(text) for text in texts]
 
 
 def _wrap_chunking_embed_model(embed_model, max_batch_size: int | None = None):
@@ -284,15 +334,11 @@ def _rechunk_oversized_nodes(nodes, max_chars: int = _MAX_EMBED_CHARS):
                 for i in range(0, len(content), max_chars)
             ]
             logger.debug(
-                "Fallback manual rechunking split oversized node of length %s into %s fixed chunks.",
-                len(content),
-                len(new_nodes),
+                f"Fallback manual rechunking split oversized node of length {len(content)} into {len(new_nodes)} fixed chunks."
             )
         else:
             logger.debug(
-                "Re-splitting oversized node of length %s into %s chunks for embedding safety.",
-                len(content),
-                len(new_nodes),
+                f"Re-splitting oversized node of length {len(content)} into {len(new_nodes)} chunks for embedding safety."
             )
         queue = list(new_nodes) + queue
 
@@ -380,10 +426,8 @@ class VectorStoreManager:
 
                 safe_chunk_size = max(1024, len(str(getattr(doc, "extra_info", ""))) + 1)
                 logger.debug(
-                    "Using SentenceSplitter chunk_size=%s for document %s to accommodate metadata of length %s.",
-                    safe_chunk_size,
-                    i + 1,
-                    len(str(getattr(doc, "extra_info", ""))),
+                    f"Using SentenceSplitter chunk_size={safe_chunk_size} for document {i+1} "
+                    f"to accommodate metadata of length {len(str(getattr(doc, 'extra_info', '')))}."
                 )
                 base_splitter = SentenceSplitter(chunk_size=safe_chunk_size)
                 nodes = base_splitter.get_nodes_from_documents([doc])
