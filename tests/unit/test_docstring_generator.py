@@ -103,3 +103,19 @@ def test_llm_backend_uses_chat_messages(tmp_path):
     assert sample in updated
     assert llm.messages and isinstance(llm.messages[0], ChatMessage)
     assert "Ping value." in sample.read_text()
+
+
+def test_progress_callback_reports_status(tmp_path):
+    sample = tmp_path / "progress_sample.py"
+    sample.write_text("def hello(name):\n    return name\n")
+
+    statuses = []
+
+    def record_progress(path, status):
+        statuses.append((path.name, status))
+
+    generator = DocstringGenerator(tmp_path)
+    generator.run(progress_callback=record_progress)
+
+    assert ("progress_sample.py", "start") in statuses
+    assert any(status == "updated" for _, status in statuses)

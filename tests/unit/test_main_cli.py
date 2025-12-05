@@ -480,7 +480,7 @@ def test_generate_docstrings_cli_with_llm(monkeypatch, tmp_path):
             created["backend"] = backend
             created["llm_client"] = llm_client
 
-        def run(self, dry_run=False):
+        def run(self, dry_run=False, **_):
             created["dry_run"] = dry_run
             return [tmp_path / "file.py"]
 

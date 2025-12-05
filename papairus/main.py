@@ -423,7 +423,17 @@ def generate_docstrings(
             raise click.ClickException(str(exc))
 
     generator = DocstringGenerator(path, backend=backend, llm_client=llm_client)
-    updated_files = generator.run(dry_run=dry_run)
+
+    def _progress(path: Path, status: str) -> None:
+        if status == "start":
+            click.echo(f"[{backend}] Scanning {path}...", err=True)
+        elif status == "updated":
+            action = "Would update" if dry_run else "Updated"
+            click.echo(f" -> {action} docstrings", err=True)
+        elif status == "skipped":
+            click.echo(" -> No docstring changes", err=True)
+
+    updated_files = generator.run(dry_run=dry_run, progress_callback=_progress)
 
     if not updated_files:
         click.echo("No docstring updates needed.")

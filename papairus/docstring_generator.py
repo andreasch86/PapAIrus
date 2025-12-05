@@ -6,7 +6,7 @@ import ast
 from dataclasses import dataclass
 from pathlib import Path
 from types import SimpleNamespace
-from typing import Any, Iterable, List, Optional, Sequence
+from typing import Any, Callable, Iterable, List, Optional, Sequence
 
 from llama_index.core.llms import ChatMessage, MessageRole
 
@@ -55,7 +55,11 @@ class DocstringGenerator:
             raise ValueError("backend must be one of: ast, gemini, gemma")
         self.llm_client = llm_client
 
-    def run(self, dry_run: bool = False) -> List[Path]:
+    def run(
+        self,
+        dry_run: bool = False,
+        progress_callback: Optional[Callable[[Path, str], None]] = None,
+    ) -> List[Path]:
         """Generate docstrings for all Python files under ``root``.
 
         Args:
@@ -68,8 +72,15 @@ class DocstringGenerator:
 
         updated_files: List[Path] = []
         for file_path in self._python_files():
-            if self._update_file(file_path, dry_run=dry_run):
+            if progress_callback:
+                progress_callback(file_path, "start")
+
+            changed = self._update_file(file_path, dry_run=dry_run)
+            if changed:
                 updated_files.append(file_path)
+
+            if progress_callback:
+                progress_callback(file_path, "updated" if changed else "skipped")
         return updated_files
 
     def _python_files(self) -> Iterable[Path]:
