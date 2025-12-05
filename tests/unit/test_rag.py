@@ -138,6 +138,19 @@ def test_rerank_sorts_documents(monkeypatch, patch_dependencies, tmp_path):
     assert results == ["doc-2", "doc-1"]
 
 
+def test_rerank_gracefully_handles_invalid_json(monkeypatch, patch_dependencies, tmp_path):
+    settings = ChatCompletionSettings(model="gemma-local")
+    assistant = rag_module.RepoAssistant(settings, tmp_path / "db.json")
+
+    # Force an invalid response payload from the LLM chat call
+    assistant.weak_model.chat_responses = [""]
+
+    docs = ["doc-a", "doc-b", "doc-c"]
+    results = assistant.rerank("query", docs)
+
+    assert results == docs[:5]
+
+
 def test_rag_and_rag_ar_delegate_to_llms(patch_dependencies, tmp_path):
     settings = ChatCompletionSettings(model="gemma-local")
     assistant = rag_module.RepoAssistant(settings, tmp_path / "db.json")

@@ -62,11 +62,26 @@ class RepoAssistant:
             temperature=0,
             messages=relevance_ranking_chat_template.format_messages(query=query, docs=docs),
         )
-        scores = json.loads(response.message.content)["documents"]  # type: ignore
+
+        content = getattr(getattr(response, "message", None), "content", None)
+        if not content:
+            logger.warning("Rerank response missing content; returning top docs without rerank.")
+            return list(docs)[:5]
+
+        try:
+            parsed = json.loads(content)
+            scores = parsed.get("documents", [])
+        except (json.JSONDecodeError, TypeError, AttributeError) as exc:
+            logger.warning(
+                "Failed to parse rerank response as JSON; returning top docs without rerank.",
+                exc_info=exc,
+            )
+            return list(docs)[:5]
+
         logger.debug(f"scores: {scores}")
-        sorted_data = sorted(scores, key=lambda x: x["relevance_score"], reverse=True)
-        top_5_contents = [doc["content"] for doc in sorted_data[:5]]
-        return top_5_contents
+        sorted_data = sorted(scores, key=lambda x: x.get("relevance_score", 0), reverse=True)
+        top_5_contents = [doc.get("content") for doc in sorted_data[:5] if doc.get("content")]
+        return top_5_contents or list(docs)[:5]
 
     def rag(self, query, retrieved_documents):
         rag_prompt = rag_template.format(query=query, information="\n\n".join(retrieved_documents))
@@ -136,7 +151,11 @@ class RepoAssistant:
         unique_documents = [result["text"] for result in unique_results]
         logger.debug(f"Unique documents: {unique_documents}")
 
-        unique_code = [result.get("metadata", {}).get("code_content") for result in unique_results]
+        unique_code = [
+            result.get("metadata", {}).get("code_content")
+            for result in unique_results
+            if result.get("metadata", {}).get("code_content")
+        ]
         logger.debug(f"Unique code content: {unique_code}")
 
         # Step 5: Rerank documents based on relevance
