@@ -30,6 +30,7 @@ PapAIrus exposes the `papairus` command for documentation generation and an inte
 
 ### Generate or preview docstrings for Python files
 Use the `generate-docstrings` command to add Google-style docstrings to Python callables. `__init__` methods are skipped automatically.
+All PapAIrus CLI commands read the Gemini key from the `GEMINI_API_KEY` environment variable when a Gemini model is selected, so you don't need to pass it explicitly.
 
 ```bash
 # AST-only generation (no network calls)

@@ -1,3 +1,4 @@
+import os
 import sys
 from importlib import import_module, metadata
 from pathlib import Path
@@ -363,6 +364,8 @@ def chat_with_repo():
 @click.option(
     "--gemini-api-key",
     default=None,
+    envvar="GEMINI_API_KEY",
+    show_envvar=True,
     help="API key for Gemini models.",
 )
 @click.option(
@@ -399,13 +402,19 @@ def generate_docstrings(
         if selected_model is None:
             selected_model = "gemini-2.5-flash" if backend == "gemini" else "gemma-local"
 
+        resolved_gemini_api_key = gemini_api_key or os.getenv("GEMINI_API_KEY")
+
         try:
             chat_settings = ChatCompletionSettings(
                 model=selected_model,
                 temperature=temperature,
                 request_timeout=request_timeout,
                 gemini_base_url=gemini_base_url,
-                gemini_api_key=SecretStr(gemini_api_key) if gemini_api_key else None,
+                gemini_api_key=(
+                    SecretStr(resolved_gemini_api_key)
+                    if resolved_gemini_api_key
+                    else None
+                ),
                 ollama_base_url=ollama_base_url,
                 ollama_model=ollama_model,
             )

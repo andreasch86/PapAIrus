@@ -473,6 +473,7 @@ def test_generate_docstrings_cli_dry_run(tmp_path):
 
 def test_generate_docstrings_cli_with_llm(monkeypatch, tmp_path):
     created = {}
+    captured_settings = {}
 
     class DummyGenerator:
         def __init__(self, root, backend="ast", llm_client=None, **_):
@@ -484,7 +485,12 @@ def test_generate_docstrings_cli_with_llm(monkeypatch, tmp_path):
             return [tmp_path / "file.py"]
 
     monkeypatch.setattr(main, "DocstringGenerator", DummyGenerator)
-    monkeypatch.setattr(main, "build_llm", lambda settings: "llm")
+    def record_settings(settings):
+        captured_settings["api_key"] = settings.gemini_api_key.get_secret_value()
+        return "llm"
+
+    monkeypatch.setattr(main, "build_llm", record_settings)
+    monkeypatch.setenv("GEMINI_API_KEY", "env-secret")
 
     runner = CliRunner()
     result = runner.invoke(
@@ -494,14 +500,13 @@ def test_generate_docstrings_cli_with_llm(monkeypatch, tmp_path):
             str(tmp_path),
             "--backend",
             "gemini",
-            "--gemini-api-key",
-            "secret",
         ],
     )
 
     assert result.exit_code == 0
     assert created["backend"] == "gemini"
     assert created["llm_client"] == "llm"
+    assert captured_settings["api_key"] == "env-secret"
     assert "docstrings in 1 file" in result.output
 
 
