@@ -7,8 +7,10 @@ import markdown
 
 
 class GradioInterface:
-    def __init__(self, respond_function):
+    def __init__(self, respond_function, launch_kwargs: dict | None = None):
         self.respond = respond_function
+        self.launch_kwargs = launch_kwargs or {}
+        self.demo = None
         self.cssa = """
                 <style>
                         .outer-box {
@@ -180,16 +182,28 @@ class GradioInterface:
                 self.wrapper_respond,
                 inputs=[msg, system],
                 outputs=[msg, output1, output2, output3, code, output4],
+                api_name="respond",
             )
             btnc.click(self.clean, outputs=[msg, output1, output2, output3, code, output4])
             msg.submit(
                 self.wrapper_respond,
                 inputs=[msg, system],
                 outputs=[msg, output1, output2, output3, code, output4],
+                api_name="respond",
             )  # Press enter to submit
 
         gr.close_all()
-        demo.queue().launch(share=False, height=800)
+        launch_options = {"share": False, "height": 800}
+        launch_options.update(self.launch_kwargs)
+        queued_demo = demo.queue()
+        self.demo = queued_demo
+        self.launch_handle = queued_demo.launch(**launch_options)
+
+    def close(self):
+        if self.demo:
+            self.demo.close()
+        if hasattr(self, "launch_handle") and hasattr(self.launch_handle, "close"):
+            self.launch_handle.close()
 
 
 # English
