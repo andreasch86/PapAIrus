@@ -108,6 +108,39 @@ def _list_ollama_models(base_url: str | None) -> list[str] | None:
     return sorted(model for model in normalized if model)
 
 
+def _validate_embedding_vector(embedding, base_url: str | None, model_name: str | None):
+    """Ensure embeddings are non-empty numeric vectors."""
+
+    if not isinstance(embedding, (list, tuple)):
+        raise EmbeddingServiceError(
+            "Embedding request to {url} failed for model '{model}'. "
+            "Ensure the Ollama daemon is reachable and the embedding model is healthy.".format(
+                url=base_url or "the configured Ollama host", model=model_name
+            )
+        )
+
+    if len(embedding) == 0:
+        raise EmbeddingServiceError(
+            "Embedding request to {url} failed for model '{model}'. "
+            "Received an empty embedding payload from the service.".format(
+                url=base_url or "the configured Ollama host", model=model_name
+            )
+        )
+
+    cleaned: list[float] = []
+    for value in embedding:
+        if not isinstance(value, (int, float)):
+            raise EmbeddingServiceError(
+                "Embedding request to {url} failed for model '{model}'. "
+                "Embedding vector contained non-numeric values.".format(
+                    url=base_url or "the configured Ollama host", model=model_name
+                )
+            )
+        cleaned.append(float(value))
+
+    return cleaned
+
+
 class _ChunkingEmbeddingWrapper(BaseEmbedding):
     """A light wrapper that chunks embedding batches to reduce request load."""
 
@@ -168,13 +201,28 @@ class _ChunkingEmbeddingWrapper(BaseEmbedding):
             for start in range(0, len(text_list), self._max_batch_size):
                 batch = text_list[start : start + self._max_batch_size]
                 try:
-                    embeddings.extend(wrapped.get_text_embedding_batch(batch))
+                    batch_embeddings = wrapped.get_text_embedding_batch(batch)
                 except Exception:
-                    embeddings.extend(self._embed_batch_via_http(batch))
+                    batch_embeddings = self._embed_batch_via_http(batch)
+
+                for emb in batch_embeddings:
+                    embeddings.append(
+                        _validate_embedding_vector(
+                            emb, getattr(self, "base_url", None), getattr(self, "model_name", None)
+                        )
+                    )
+
             return embeddings
 
         if hasattr(wrapped, "get_text_embedding"):
-            return [self._get_text_embedding(text) for text in texts]
+            return [
+                _validate_embedding_vector(
+                    self._get_text_embedding(text),
+                    getattr(self, "base_url", None),
+                    getattr(self, "model_name", None),
+                )
+                for text in texts
+            ]
 
         raise AttributeError("Underlying embed model does not support embedding APIs")
 
@@ -235,15 +283,19 @@ class _ChunkingEmbeddingWrapper(BaseEmbedding):
 
         if isinstance(payload, dict):
             if "embedding" in payload:
-                return payload["embedding"]
+                return _validate_embedding_vector(
+                    payload["embedding"], base_url, model_name
+                )
             elif payload.get("data"):
                 first = payload["data"][0]
                 if isinstance(first, dict) and "embedding" in first:
-                    return first["embedding"]
+                    return _validate_embedding_vector(
+                        first["embedding"], base_url, model_name
+                    )
             elif payload.get("embeddings"):
                 first = payload["embeddings"][0]
                 if isinstance(first, (list, tuple)):
-                    return list(first)
+                    return _validate_embedding_vector(first, base_url, model_name)
 
         raise EmbeddingServiceError(
             "Embedding request to {url} failed for model '{model}'. "
