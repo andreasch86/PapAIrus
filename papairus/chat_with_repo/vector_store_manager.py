@@ -259,6 +259,15 @@ class _ChunkingEmbeddingWrapper(BaseEmbedding):
         wrapped = object.__getattribute__(self, "_wrapped_embed_model")
         return getattr(wrapped, name)
 
+    def __setattr__(self, name, value):
+        # Allow tests to monkeypatch private attributes (e.g., HTTP fallback) while
+        # keeping pydantic's BaseModel attribute validation for public fields.
+        if name.startswith("_"):
+            object.__setattr__(self, name, value)
+            return
+
+        super().__setattr__(name, value)
+
     # HTTP fallback helpers -------------------------------------------------
 
     def _embed_via_http(self, text: str):
@@ -273,8 +282,22 @@ class _ChunkingEmbeddingWrapper(BaseEmbedding):
         payloads = [
             {"model": model_name, "prompt": text},
             {"model": model_name, "input": text},
+            {"model": model_name, "input": [text]},
         ]
         last_exc: Exception | None = None
+
+        try:
+            import ollama
+
+            client = ollama.Client(host=base_url)
+            client_payload = {"model": model_name, "prompt": text}
+            client_response = client.embeddings(**client_payload)
+            if isinstance(client_response, dict) and "embedding" in client_response:
+                return _validate_embedding_vector(
+                    client_response["embedding"], base_url, model_name
+                )
+        except Exception as exc:  # noqa: BLE001 - fall back to raw HTTP below
+            last_exc = exc
 
         def _extract_embedding(payload: dict):
             if not isinstance(payload, dict):

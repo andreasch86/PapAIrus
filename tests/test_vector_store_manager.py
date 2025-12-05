@@ -1,4 +1,5 @@
 import asyncio
+import sys
 import types
 
 import pytest
@@ -12,6 +13,13 @@ from papairus.chat_with_repo.vector_store_manager import (
     _rechunk_oversized_nodes,
 )
 from papairus.exceptions import EmbeddingServiceError, MissingEmbeddingModelError
+
+
+@pytest.fixture(autouse=True)
+def prevent_real_ollama(monkeypatch):
+    """Avoid contacting a real Ollama daemon during unit tests."""
+
+    monkeypatch.setitem(sys.modules, "ollama", None)
 
 
 class DummyDocument:
@@ -700,6 +708,103 @@ def test_embed_via_http_requires_base_url(monkeypatch):
 
     with pytest.raises(EmbeddingServiceError):
         wrapper._embed_via_http("text")
+
+
+def test_embed_via_http_prefers_ollama_client(monkeypatch):
+    from papairus.chat_with_repo.vector_store_manager import _ChunkingEmbeddingWrapper
+
+    class BareEmbed:
+        base_url = "http://localhost:11434"
+        model_name = "nomic-embed-text"
+
+    class FakeClient:
+        def __init__(self, host):
+            assert host == "http://localhost:11434"
+
+        def embeddings(self, **kwargs):
+            assert kwargs == {"model": "nomic-embed-text", "prompt": "text"}
+            return {"embedding": [0.42, 0.43]}
+
+    fake_ollama = type("FakeOllama", (), {"Client": FakeClient})
+    monkeypatch.setitem(sys.modules, "ollama", fake_ollama)
+
+    def fake_post(_url, _json, _timeout):
+        raise AssertionError("HTTP fallback should not be hit when client succeeds")
+
+    monkeypatch.setattr(
+        "papairus.chat_with_repo.vector_store_manager.requests.post", fake_post
+    )
+
+    wrapper = _ChunkingEmbeddingWrapper(BareEmbed(), max_batch_size=1)
+
+    assert wrapper._embed_via_http("text") == [0.42, 0.43]
+
+
+def test_chunking_wrapper_allows_private_setattr():
+    from papairus.chat_with_repo.vector_store_manager import _ChunkingEmbeddingWrapper
+
+    class BareEmbed:
+        base_url = "http://localhost:11434"
+        model_name = "nomic-embed-text"
+
+    wrapper = _ChunkingEmbeddingWrapper(BareEmbed(), max_batch_size=1)
+    wrapper._embed_batch_via_http = lambda texts: [[1.0] for _ in texts]  # type: ignore[attr-defined]
+
+    assert wrapper._embed_batch_via_http(["a"]) == [[1.0]]
+
+
+def test_chunking_wrapper_allows_public_setattr():
+    from papairus.chat_with_repo.vector_store_manager import _ChunkingEmbeddingWrapper
+
+    class BareEmbed:
+        base_url = "http://localhost:11434"
+        model_name = "nomic-embed-text"
+
+    wrapper = _ChunkingEmbeddingWrapper(BareEmbed(), max_batch_size=1)
+    wrapper.model_name = "different-model"
+
+    assert wrapper.model_name == "different-model"
+
+
+def test_embed_via_http_skips_client_without_embedding(monkeypatch):
+    from papairus.chat_with_repo.vector_store_manager import _ChunkingEmbeddingWrapper
+
+    class BareEmbed:
+        base_url = "http://localhost:11434"
+        model_name = "nomic-embed-text"
+
+    class FakeClient:
+        def __init__(self, host):
+            assert host == "http://localhost:11434"
+
+        def embeddings(self, **kwargs):
+            return {"unexpected": True}
+
+    fake_ollama = type("FakeOllama", (), {"Client": FakeClient})
+    monkeypatch.setitem(sys.modules, "ollama", fake_ollama)
+
+    called = {}
+
+    def fake_post(url, json, timeout):
+        called["hit"] = True
+
+        class Response:
+            def raise_for_status(self):
+                return None
+
+            def json(self):
+                return {"embedding": [0.7, 0.8]}
+
+        return Response()
+
+    monkeypatch.setattr(
+        "papairus.chat_with_repo.vector_store_manager.requests.post", fake_post
+    )
+
+    wrapper = _ChunkingEmbeddingWrapper(BareEmbed(), max_batch_size=1)
+
+    assert wrapper._embed_via_http("text") == [0.7, 0.8]
+    assert called["hit"] is True
 
 
 def test_embed_via_http_raises_on_bad_payload(monkeypatch):
