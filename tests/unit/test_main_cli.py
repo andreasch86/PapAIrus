@@ -457,6 +457,20 @@ def test_module_entrypoint_import_does_not_trigger_cli():
     assert calls == {}
 
 
+def test_generate_docstrings_cli_dry_run(tmp_path):
+    sample = tmp_path / "cli_sample.py"
+    sample.write_text("def hello(name):\n    return name\n")
+
+    runner = CliRunner()
+    result = runner.invoke(
+        main.generate_docstrings, ["--path", str(tmp_path), "--dry-run"]
+    )
+
+    assert result.exit_code == 0
+    assert "Would update docstrings" in result.output
+    assert sample.read_text().count('"""') == 0
+
+
 def test_chat_with_repo_imports_fallback(monkeypatch):
     dummy_module = types.SimpleNamespace(main=lambda: None)
     attempts = {"count": 0}

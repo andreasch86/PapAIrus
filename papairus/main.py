@@ -7,6 +7,7 @@ import git
 from pydantic import ValidationError
 
 from papairus.doc_meta_info import DocItem, MetaInfo
+from papairus.docstring_generator import DocstringGenerator
 from papairus.exceptions import NoChangesWarning
 from papairus.log import logger, set_logger_level_from_config
 from papairus.runner import Runner
@@ -308,6 +309,37 @@ def chat_with_repo():
         raise click.ClickException("papairus.chat_with_repo.main is not callable")
 
     chat_main()
+
+
+@cli.command("generate-docstrings")
+@click.option(
+    "--path",
+    "-p",
+    default=".",
+    show_default=True,
+    type=click.Path(exists=True, file_okay=False, dir_okay=True, path_type=Path),
+    help="Root directory to scan for Python files.",
+)
+@click.option(
+    "--dry-run",
+    is_flag=True,
+    default=False,
+    help="Preview docstring updates without modifying files.",
+)
+def generate_docstrings(path: Path, dry_run: bool):
+    """Add Google-style docstrings to callables missing complete documentation."""
+
+    generator = DocstringGenerator(path)
+    updated_files = generator.run(dry_run=dry_run)
+
+    if not updated_files:
+        click.echo("No docstring updates needed.")
+        return
+
+    action = "Would update" if dry_run else "Updated"
+    click.echo(f"{action} docstrings in {len(updated_files)} file(s):")
+    for file_path in updated_files:
+        click.echo(f"- {file_path}")
 
 
 if __name__ == "__main__":  # pragma: no cover
