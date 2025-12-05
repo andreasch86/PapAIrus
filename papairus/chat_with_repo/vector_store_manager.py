@@ -157,6 +157,7 @@ class _ChunkingEmbeddingWrapper(BaseEmbedding):
 
         object.__setattr__(self, "_wrapped_embed_model", embed_model)
         object.__setattr__(self, "_max_batch_size", max_batch_size)
+        object.__setattr__(self, "_last_embedding_dim", None)
 
         model_name = getattr(embed_model, "model_name", None) or getattr(
             embed_model, "model", "unknown"
@@ -182,11 +183,13 @@ class _ChunkingEmbeddingWrapper(BaseEmbedding):
         try:
             if hasattr(wrapped, "get_text_embedding"):
                 embedding = wrapped.get_text_embedding(text)
-                return _validate_embedding_vector(
+                cleaned = _validate_embedding_vector(
                     embedding,
                     getattr(self, "base_url", None),
                     getattr(self, "model_name", None),
                 )
+                object.__setattr__(self, "_last_embedding_dim", len(cleaned))
+                return cleaned
         except Exception:
             # Fall back to the HTTP embeddings endpoint when the wrapped model fails
             # (e.g., incompatible client or API change).
@@ -231,11 +234,11 @@ class _ChunkingEmbeddingWrapper(BaseEmbedding):
                         )
 
                 for emb in batch_embeddings:
-                    embeddings.append(
-                        _validate_embedding_vector(
-                            emb, getattr(self, "base_url", None), getattr(self, "model_name", None)
-                        )
+                    cleaned = _validate_embedding_vector(
+                        emb, getattr(self, "base_url", None), getattr(self, "model_name", None)
                     )
+                    object.__setattr__(self, "_last_embedding_dim", len(cleaned))
+                    embeddings.append(cleaned)
 
             return embeddings
 
@@ -274,6 +277,10 @@ class _ChunkingEmbeddingWrapper(BaseEmbedding):
         base_url = getattr(self, "base_url", None)
         model_name = getattr(self, "model_name", None) or getattr(self, "model", None)
 
+        # Trim extremely long payloads defensively to reduce the odds of empty or
+        # failed embeddings from the server while preserving semantics.
+        text = text[:_MAX_EMBED_CHARS]
+
         if not base_url or not model_name:
             raise EmbeddingServiceError(
                 "Embedding request failed because base URL or model name was not configured."
@@ -293,9 +300,11 @@ class _ChunkingEmbeddingWrapper(BaseEmbedding):
             client_payload = {"model": model_name, "prompt": text}
             client_response = client.embeddings(**client_payload)
             if isinstance(client_response, dict) and "embedding" in client_response:
-                return _validate_embedding_vector(
+                cleaned = _validate_embedding_vector(
                     client_response["embedding"], base_url, model_name
                 )
+                object.__setattr__(self, "_last_embedding_dim", len(cleaned))
+                return cleaned
         except Exception as exc:  # noqa: BLE001 - fall back to raw HTTP below
             last_exc = exc
 
@@ -336,7 +345,9 @@ class _ChunkingEmbeddingWrapper(BaseEmbedding):
                 response.raise_for_status()
 
                 try:
-                    return _extract_embedding(response.json())
+                    cleaned = _extract_embedding(response.json())
+                    object.__setattr__(self, "_last_embedding_dim", len(cleaned))
+                    return cleaned
                 except EmbeddingServiceError as embed_exc:
                     last_exc = embed_exc
                     # Try the alternate payload when the payload shape was accepted
@@ -349,6 +360,18 @@ class _ChunkingEmbeddingWrapper(BaseEmbedding):
                 if status and status >= 500:
                     continue
                 _raise_embedding_model_error(exc, self)
+
+        if (
+            isinstance(last_exc, EmbeddingServiceError)
+            and "empty embedding payload" in str(last_exc).lower()
+            and getattr(self, "_last_embedding_dim", None)
+        ):
+            dim = int(self._last_embedding_dim)  # type: ignore[arg-type]
+            logger.warning(
+                "Embedding service returned an empty vector; substituting zeros of length %s.",
+                dim,
+            )
+            return [0.0 for _ in range(dim)]
 
         _raise_embedding_model_error(
             last_exc

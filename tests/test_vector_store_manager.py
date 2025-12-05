@@ -1106,6 +1106,36 @@ def test_embed_via_http_retries_with_alternate_payload_on_empty(monkeypatch):
     assert wrapper._embed_via_http("text") == [0.1, 0.2]
 
 
+def test_embed_via_http_substitutes_zero_vector_on_empty_payload(monkeypatch):
+    from papairus.chat_with_repo.vector_store_manager import _ChunkingEmbeddingWrapper
+
+    class BareEmbed:
+        base_url = "http://localhost:11434"
+        model_name = "nomic-embed-text"
+
+    def fake_post(url, json, timeout):
+        class Response:
+            def __init__(self, payload):
+                self._payload = payload
+
+            def raise_for_status(self):
+                return None
+
+            def json(self):
+                return {"embedding": []}
+
+        return Response(json)
+
+    monkeypatch.setattr(
+        "papairus.chat_with_repo.vector_store_manager.requests.post", fake_post
+    )
+
+    wrapper = _ChunkingEmbeddingWrapper(BareEmbed(), max_batch_size=1)
+    wrapper._last_embedding_dim = 2
+
+    assert wrapper._embed_via_http("text") == [0.0, 0.0]
+
+
 def test_embed_via_http_rejects_non_list_embedding(monkeypatch):
     from papairus.chat_with_repo.vector_store_manager import _ChunkingEmbeddingWrapper
 
