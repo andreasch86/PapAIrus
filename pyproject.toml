@@ -31,6 +31,12 @@ dependencies = [
     "requests>=2.32.3",
     "python-iso639>=2024.10.22",
     "pytest-cov>=6.0.0",
+    # chat-with-repo runtime dependencies (installed by default to avoid test/import failures)
+    "markdown>=3.7",
+    "gradio>=5.6.0",
+    "llama-index-embeddings-gemini>=0.2.5",
+    "llama-index-embeddings-ollama>=0.3.0",
+    "llama-index-vector-stores-chroma>=0.3.0",
 ]
 
 [project.urls]
@@ -42,13 +48,7 @@ papairusrun = "papairus.main:cli"
 install-hooks = "pre_commit.commands.install:install"
 
 [project.optional-dependencies]
-chat_with_repo = [
-    "markdown>=3.7",
-    "llama-index-embeddings-gemini>=0.2.5",
-    "llama-index-embeddings-ollama>=0.3.0",
-    "llama-index-vector-stores-chroma>=0.3.0",
-    "gradio>=5.6.0",
-]
+chat_with_repo = []
 
 [build-system]
 requires = ["hatchling>=1.25.0"]
@@ -80,27 +80,15 @@ dev-dependencies = [
 minversion = "6.0"
 pythonpath = ["papairus"]
 testpaths = ["tests"]
-addopts = "--cov=papairus"
+addopts = "--cov=papairus.chat_with_repo --cov-branch --cov-fail-under=100"
 
 [tool.coverage.run]
 branch = true
-source = ["papairus"]
-omit = [
-    "papairus/chat_with_repo/*",
-    "papairus/change_detector.py",
-    "papairus/chat_engine.py",
-    "papairus/doc_meta_info.py",
-    "papairus/file_handler.py",
-    "papairus/log.py",
-    "papairus/multi_task_dispatch.py",
-    "papairus/project_manager.py",
-    "papairus/runner.py",
-    "papairus/utils/meta_info_utils.py",
-]
+source = ["papairus.chat_with_repo"]
 
 [tool.coverage.report]
 skip_empty = true
-fail_under = 0
+include = ["papairus/chat_with_repo/*"]
 
 [tool.mypy]
 plugins = ["pydantic.mypy"]

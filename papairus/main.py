@@ -1,6 +1,6 @@
+import sys
 from importlib import import_module, metadata
 from pathlib import Path
-import sys
 
 import click
 import git

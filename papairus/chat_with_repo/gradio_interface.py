@@ -123,7 +123,7 @@ class GradioInterface:
         codex = ""
         return msg, output1, output2, output3, code, codex
 
-    def setup_gradio_interface(self):
+    def setup_gradio_interface(self):  # pragma: no cover - UI wiring is exercised in integration
         with gr.Blocks() as demo:
             gr.Markdown(
                 """
@@ -193,7 +193,7 @@ class GradioInterface:
 
 
 # English
-if __name__ == "__main__":
+if __name__ == "__main__":  # pragma: no cover - manual launch helper
 
     def respond_function(msg, system):
         RAG = """

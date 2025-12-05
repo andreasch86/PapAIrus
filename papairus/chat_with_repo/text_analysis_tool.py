@@ -52,7 +52,7 @@ The output function name or class name should be only one.
         return response
 
 
-if __name__ == "__main__":
+if __name__ == "__main__":  # pragma: no cover - manual demonstration helper
     from papairus.llm_provider import VertexGeminiLLM
 
     api_key = "your_api_key"

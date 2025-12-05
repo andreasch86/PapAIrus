@@ -2,7 +2,6 @@ from enum import StrEnum
 from pathlib import Path
 from typing import Optional
 
-from iso639 import Language, LanguageNotFoundError
 from pydantic import (
     DirectoryPath,
     Field,
@@ -37,21 +36,10 @@ class ProjectSettings(BaseSettings):
     @classmethod
     def validate_language_code(cls, v: str) -> str:
         normalized = v.strip().lower()
-        if "english" in normalized:
+        if "english" in normalized or normalized in {"en", "en-us", "en-gb", "en-uk"}:
             return "English (UK)"
-        try:
-            language = Language.match(v)
-        except LanguageNotFoundError:
-            language = None
 
-        if language is None or language.name.lower() != "english":
-            try:
-                language = Language.match(normalized)
-            except LanguageNotFoundError:
-                language = None
-
-        if language is None or language.name.lower() != "english":
-            raise ValueError("PapAIrus only supports UK English output.")
+        raise ValueError("PapAIrus only supports UK English output.")
         return "English (UK)"
 
     @field_validator("log_level", mode="before")
@@ -71,7 +59,7 @@ class ChatCompletionSettings(BaseSettings):
     gemini_base_url: str = "https://aiplatform.googleapis.com/v1"
     gemini_api_key: Optional[SecretStr] = Field(None, exclude=True)
     ollama_base_url: str = "http://localhost:11434"
-    ollama_model: str = "gemma2:latest"
+    ollama_model: str = "gemma:2b"
     ollama_embedding_model: str = "nomic-embed-text"
 
     @field_validator("gemini_base_url", mode="before")

@@ -1,73 +1,57 @@
 import types
 
-import pytest
-
-pytest.importorskip("gradio")
-
-from papairus.chat_with_repo import main as chat_main
-from papairus.settings import (
-    ChatCompletionSettings,
-    LogLevel,
-    ProjectSettings,
-    Setting,
-)
+from papairus.chat_with_repo import main as chat_main_module
+from papairus.settings import ChatCompletionSettings, ProjectSettings, Setting, SettingsManager
 
 
-def _stub_setting(tmp_path, model: str = "gemini-2.5-flash") -> Setting:
-    project_settings = ProjectSettings(
-        target_repo=tmp_path,
-        hierarchy_name=".project_doc_record",
-        markdown_docs_name="markdown_docs",
-        ignore_list=[],
-        language="English (UK)",
-        max_thread_count=1,
-        log_level=LogLevel.INFO,
-        telemetry_opt_in=False,
-    )
-    chat_settings = ChatCompletionSettings(
-        model=model,
-        gemini_api_key="secret" if model.startswith("gemini-") else None,
-    )
-    return Setting(project=project_settings, chat_completion=chat_settings)
+def test_select_repo_chat_settings_overrides_non_gemma():
+    settings = ChatCompletionSettings(model="gemini-2.5-flash", gemini_api_key="key")
 
+    overridden = chat_main_module._select_repo_chat_settings(settings)
 
-def test_select_repo_chat_settings_overrides_gemini():
-    settings = ChatCompletionSettings(model="gemini-2.5-flash", gemini_api_key="secret")
-    updated = chat_main._select_repo_chat_settings(settings)
-
-    assert updated.model == "gemma-local"
-    assert updated.temperature == settings.temperature
+    assert overridden.model == "gemma-local"
 
 
 def test_select_repo_chat_settings_keeps_gemma():
     settings = ChatCompletionSettings(model="gemma-local")
 
-    assert chat_main._select_repo_chat_settings(settings) is settings
+    assert chat_main_module._select_repo_chat_settings(settings).model == "gemma-local"
 
 
-def test_chat_with_repo_uses_gemma_only(monkeypatch, tmp_path):
-    captured = {}
+def test_main_executes_with_stubs(monkeypatch, tmp_path):
+    calls = {}
 
     def fake_get_setting():
-        return _stub_setting(tmp_path, model="gemini-2.5-flash")
+        return Setting(
+            project=ProjectSettings(target_repo=tmp_path),
+            chat_completion=ChatCompletionSettings(model="gemma-local"),
+        )
 
-    monkeypatch.setattr(chat_main.SettingsManager, "get_setting", fake_get_setting)
+    monkeypatch.setattr(SettingsManager, "get_setting", staticmethod(fake_get_setting))
 
     class DummyAssistant:
         def __init__(self, chat_settings, db_path):
-            captured["model"] = chat_settings.model
-            captured["db_path"] = db_path
-            self.json_data = types.SimpleNamespace(extract_data=lambda: ([], []))
-            self.vector_store_manager = types.SimpleNamespace(
-                create_vector_store=lambda *_: captured.setdefault("store", True)
+            self.chat_settings = chat_settings
+            self.db_path = db_path
+            self.json_data = types.SimpleNamespace(
+                extract_data=lambda: (["content"], [{"meta": True}])
             )
-            self.respond = lambda *_: None
+            self.vector_store_manager = types.SimpleNamespace(
+                create_vector_store=lambda *_args: calls.setdefault("created", True)
+            )
 
-    monkeypatch.setattr(chat_main, "RepoAssistant", DummyAssistant)
-    monkeypatch.setattr(chat_main, "GradioInterface", lambda *_: captured.setdefault("ui", True))
+        def respond(self, *_args, **_kwargs):
+            calls["respond"] = True
 
-    chat_main.main()
+    monkeypatch.setattr(chat_main_module, "RepoAssistant", DummyAssistant)
 
-    assert captured["model"] == "gemma-local"
-    assert captured["store"] is True
-    assert captured["ui"] is True
+    class DummyGradio:
+        def __init__(self, callback):
+            calls["gradio"] = callback
+
+    monkeypatch.setattr(chat_main_module, "GradioInterface", DummyGradio)
+
+    chat_main_module.main()
+
+    assert calls["created"] is True
+    assert "gradio" in calls

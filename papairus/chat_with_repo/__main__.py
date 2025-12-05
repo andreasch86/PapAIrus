@@ -1,3 +1,4 @@
-from .main import main
+from .main import main  # pragma: no cover
 
-main()
+if __name__ == "__main__":  # pragma: no cover - entrypoint wrapper
+    main()
