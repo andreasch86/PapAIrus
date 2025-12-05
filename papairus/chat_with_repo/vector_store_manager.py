@@ -38,6 +38,9 @@ _MAX_EMBED_CHARS = 1024
 def _raise_embedding_model_error(exc: Exception, embed_model) -> None:
     """Translate Ollama embedding errors into a clear ClickException."""
 
+    if isinstance(exc, (MissingEmbeddingModelError, EmbeddingServiceError)):
+        raise exc
+
     model_name = getattr(embed_model, "model_name", None) or getattr(
         embed_model, "model", "nomic-embed-text"
     )
@@ -73,6 +76,8 @@ def _raise_embedding_model_error(exc: Exception, embed_model) -> None:
             "Ensure the Ollama daemon is reachable and the embedding model is healthy."
             .format(target=target, model=normalized_model_name)
         ) from exc
+
+    return None
 
 
 def _normalize_model_name(name: str | None) -> str | None:
@@ -249,8 +254,36 @@ class _ChunkingEmbeddingWrapper(BaseEmbedding):
             {"model": model_name, "prompt": text},
             {"model": model_name, "input": text},
         ]
-        response = None
         last_exc: Exception | None = None
+
+        def _extract_embedding(payload: dict):
+            if not isinstance(payload, dict):
+                raise EmbeddingServiceError(
+                    "Embedding request to {url} failed for model '{model}'. "
+                    "Ensure the Ollama daemon is reachable and the embedding model is healthy."
+                    .format(url=base_url, model=model_name)
+                )
+
+            if "embedding" in payload:
+                return _validate_embedding_vector(payload["embedding"], base_url, model_name)
+
+            if payload.get("data"):
+                first = payload["data"][0]
+                if isinstance(first, dict) and "embedding" in first:
+                    return _validate_embedding_vector(
+                        first["embedding"], base_url, model_name
+                    )
+
+            if payload.get("embeddings"):
+                first = payload["embeddings"][0]
+                if isinstance(first, (list, tuple)):
+                    return _validate_embedding_vector(first, base_url, model_name)
+
+            raise EmbeddingServiceError(
+                "Embedding request to {url} failed for model '{model}'. "
+                "Ensure the Ollama daemon is reachable and the embedding model is healthy."
+                .format(url=base_url, model=model_name)
+            )
 
         for payload in payloads:
             try:
@@ -258,50 +291,30 @@ class _ChunkingEmbeddingWrapper(BaseEmbedding):
                     f"{base_url}/api/embeddings", json=payload, timeout=60
                 )
                 response.raise_for_status()
-                break
+
+                try:
+                    return _extract_embedding(response.json())
+                except EmbeddingServiceError as embed_exc:
+                    last_exc = embed_exc
+                    # Try the alternate payload when the payload shape was accepted
+                    # but produced an invalid embedding (e.g., empty payload).
+                    continue
             except Exception as exc:  # noqa: BLE001 - inspected below
                 last_exc = exc
-                response = None
-                # Try the alternate payload only for server-side failures.
                 status = getattr(getattr(exc, "response", None), "status_code", None)
+                # Try the alternate payload only for server-side failures.
                 if status and status >= 500:
                     continue
                 _raise_embedding_model_error(exc, self)
 
-        if response is None:
-            _raise_embedding_model_error(
-                last_exc
-                or EmbeddingServiceError(
-                    "Embedding request to {url} failed for model '{model}'. "
-                    "Ensure the Ollama daemon is reachable and the embedding model is healthy."
-                    .format(url=base_url, model=model_name)
-                ),
-                self,
-            )
-
-        payload = response.json()
-
-        if isinstance(payload, dict):
-            if "embedding" in payload:
-                return _validate_embedding_vector(
-                    payload["embedding"], base_url, model_name
-                )
-            elif payload.get("data"):
-                first = payload["data"][0]
-                if isinstance(first, dict) and "embedding" in first:
-                    return _validate_embedding_vector(
-                        first["embedding"], base_url, model_name
-                    )
-            elif payload.get("embeddings"):
-                first = payload["embeddings"][0]
-                if isinstance(first, (list, tuple)):
-                    return _validate_embedding_vector(first, base_url, model_name)
-
-        raise EmbeddingServiceError(
-            "Embedding request to {url} failed for model '{model}'. "
-            "Ensure the Ollama daemon is reachable and the embedding model is healthy.".format(
-                url=base_url, model=model_name
-            )
+        _raise_embedding_model_error(
+            last_exc
+            or EmbeddingServiceError(
+                "Embedding request to {url} failed for model '{model}'. "
+                "Ensure the Ollama daemon is reachable and the embedding model is healthy."
+                .format(url=base_url, model=model_name)
+            ),
+            self,
         )
 
     def _embed_batch_via_http(self, texts):
