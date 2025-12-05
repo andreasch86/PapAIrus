@@ -28,6 +28,30 @@ PapAIrus exposes the `papairus` command for documentation generation and an inte
 - **Gemma via Ollama**: set `--model gemma-local` and point to your Ollama deployment with `OLLAMA_BASE_URL`/`--base-url` (defaults to `http://localhost:11434`). Gemini keys are not required for local Gemma.
 - Embeddings follow the same provider as the model: Gemini embeddings for cloud, or `ollama_embedding_model` for local usage.
 
+### Generate or preview docstrings for Python files
+Use the `generate-docstrings` command to add Google-style docstrings to Python callables. `__init__` methods are skipped automatically.
+
+```bash
+# AST-only generation (no network calls)
+papairus generate-docstrings --path path/to/project --dry-run
+
+# Gemini-backed generation
+export GEMINI_API_KEY=your_gemini_key
+papairus generate-docstrings --path path/to/project --backend gemini \
+  --model gemini-2.5-flash --temperature 0.2
+
+# Gemma (Ollama) generation
+papairus generate-docstrings --path path/to/project --backend gemma \
+  --ollama-base-url http://localhost:11434 --ollama-model gemma:2b
+```
+
+Key options:
+- `--backend`: choose `ast` (default), `gemini`, or `gemma`.
+- `--dry-run`: show which files would change without writing them.
+- `--model`: override the default model per backend (`gemini-2.5-flash` or `gemma-local`).
+- `--gemini-base-url`/`--gemini-api-key`: control Gemini endpoints and auth.
+- `--ollama-base-url`/`--ollama-model`: control the Gemma Ollama endpoint and model.
+
 ### Generate repository documentation (CLI)
 Run from the target repository root (or pass `--target-repo-path`):
 
