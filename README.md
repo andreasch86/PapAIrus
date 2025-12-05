@@ -43,12 +43,13 @@ By default, PapAIrus targets the `codegemma:instruct` model. If it is not presen
 PapAIrus exposes a unified interface for chat and docstring generation. Choose a backend per command:
 - `ast`: offline docstring extraction (no network calls)
 - `gemini`: Google Gemini models (requires `GEMINI_API_KEY`)
-- `gemma`: Local Gemma/CodeGemma via Ollama (`--ollama-base-url` and `--ollama-model`)
+- `gemma`: Local Gemma/CodeGemma via Ollama. The Ollama model tag is configured via `--ollama-model` (defaults to `codegemma:instruct`).
 
 Defaults:
 - Gemini model: `gemini-2.5-flash`
 - Ollama base URL: `http://localhost:11434`
-- Ollama model: `codegemma:instruct` (auto-pulled if missing)
+- Ollama model tag: `codegemma:instruct` (auto-pulled if missing)
+- Chat/documentation pipeline model selector: `local-gemma` chooses the Ollama-backed engine, while any `gemini-*` value targets Gemini.
 
 Set the Gemini API key through `GEMINI_API_KEY` or `--gemini-api-key`. Ollama endpoints require no API key.
 

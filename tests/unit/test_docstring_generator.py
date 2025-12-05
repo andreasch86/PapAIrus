@@ -126,6 +126,36 @@ def test_llm_backend_strips_code_blocks_in_docstring(tmp_path):
     assert ast.get_docstring(class_node) == "Sample docstring."
 
 
+def test_llm_backend_strips_language_hints_and_recovers_docstring(tmp_path):
+    sample = tmp_path / "llm_language_hint.py"
+    sample.write_text("class LLMUsage:\n    pass\n")
+
+    class LanguageHintLLM(LLMBackend):
+        def generate_response(self, messages):  # pragma: no cover - not used
+            return None
+
+        def generate_docstring(
+            self, code_snippet: str, *, style: str = "google", existing_docstring=None
+        ):
+            return (
+                "python\n"
+                "class LLMUsage:\n"
+                '    """A class to track usage."""\n'
+                "    def __init__(self, prompt_tokens: int, completion_tokens: int):\n"
+                "        self.prompt_tokens = prompt_tokens\n"
+                "        self.completion_tokens = completion_tokens\n"
+            )
+
+    generator = DocstringGenerator(tmp_path, backend="gemma", llm_client=LanguageHintLLM())
+    updated = generator.run()
+
+    assert sample in updated
+    parsed = ast.parse(sample.read_text())
+    class_node = parsed.body[0]
+    assert isinstance(class_node, ast.ClassDef)
+    assert ast.get_docstring(class_node) == "A class to track usage."
+
+
 def test_progress_callback_reports_status(tmp_path):
     sample = tmp_path / "progress_sample.py"
     sample.write_text("def hello(name):\n    return name\n")

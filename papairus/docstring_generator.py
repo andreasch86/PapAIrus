@@ -399,11 +399,17 @@ class DocstringGenerator:
         return str(content)
 
     def _strip_delimiters(self, text: str) -> str:
-        """Remove common Markdown/code fences and string delimiters."""
+        """Remove common Markdown/code fences, language hints, and string delimiters."""
 
         text = text.strip()
         text = re.sub(r"^```(?:\w+)?\n?", "", text)
         text = re.sub(r"\n?```$", "", text)
+
+        lines = text.splitlines()
+        if lines and re.fullmatch(r"\s*(python|py|code)\s*", lines[0], re.IGNORECASE):
+            lines = lines[1:]
+        text = "\n".join(lines).strip()
+
         if text.startswith('"""') and text.endswith('"""'):
             return text[3:-3].strip()
         if text.startswith("'''") and text.endswith("'''"):
@@ -436,6 +442,14 @@ class DocstringGenerator:
         parsed_docstring = self._extract_docstring_from_code(stripped)
         if parsed_docstring:
             return textwrap.dedent(parsed_docstring).strip()
+
+        literal_match = re.search(r'"""(.*?)"""', stripped, re.DOTALL)
+        if literal_match:
+            return textwrap.dedent(literal_match.group(1)).strip()
+
+        literal_match = re.search(r"'''(.*?)'''", stripped, re.DOTALL)
+        if literal_match:
+            return textwrap.dedent(literal_match.group(1)).strip()
 
         return textwrap.dedent(stripped).strip()
 
