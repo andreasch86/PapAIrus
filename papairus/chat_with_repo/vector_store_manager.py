@@ -73,8 +73,9 @@ def _raise_embedding_model_error(exc: Exception, embed_model) -> None:
         target = base_url or "the configured Ollama host"
         raise EmbeddingServiceError(
             "Embedding request to {target} failed for model '{model}'. "
-            "Ensure the Ollama daemon is reachable and the embedding model is healthy."
-            .format(target=target, model=normalized_model_name)
+            "Ensure the Ollama daemon is reachable and the embedding model is healthy.".format(
+                target=target, model=normalized_model_name
+            )
         ) from exc
 
     return None
@@ -106,9 +107,7 @@ def _list_ollama_models(base_url: str | None) -> list[str] | None:
     models = payload.get("models", []) if isinstance(payload, dict) else []
 
     normalized = {
-        _normalize_model_name(entry.get("name"))
-        for entry in models
-        if isinstance(entry, dict)
+        _normalize_model_name(entry.get("name")) for entry in models if isinstance(entry, dict)
     }
     return sorted(model for model in normalized if model)
 
@@ -235,7 +234,7 @@ class _ChunkingEmbeddingWrapper(BaseEmbedding):
                 try:
                     batch_embeddings = wrapped.get_text_embedding_batch(batch)
                     source = "wrapped"
-                except Exception as exc:
+                except Exception:
                     try:
                         batch_embeddings = self._embed_batch_via_http(batch)
                         source = "http"
@@ -249,8 +248,7 @@ class _ChunkingEmbeddingWrapper(BaseEmbedding):
                         raise EmbeddingServiceError(
                             "Embedding request to {url} failed for model '{model}'. "
                             "Received an empty embedding payload from the service.".format(
-                                url=getattr(self, "base_url", None)
-                                or "the configured Ollama host",
+                                url=getattr(self, "base_url", None) or "the configured Ollama host",
                                 model=getattr(self, "model_name", None),
                             )
                         )
@@ -334,8 +332,9 @@ class _ChunkingEmbeddingWrapper(BaseEmbedding):
             if not isinstance(payload, dict):
                 raise EmbeddingServiceError(
                     "Embedding request to {url} failed for model '{model}'. "
-                    "Ensure the Ollama daemon is reachable and the embedding model is healthy."
-                    .format(url=base_url, model=model_name)
+                    "Ensure the Ollama daemon is reachable and the embedding model is healthy.".format(
+                        url=base_url, model=model_name
+                    )
                 )
 
             if "embedding" in payload:
@@ -344,9 +343,7 @@ class _ChunkingEmbeddingWrapper(BaseEmbedding):
             if payload.get("data"):
                 first = payload["data"][0]
                 if isinstance(first, dict) and "embedding" in first:
-                    return _validate_embedding_vector(
-                        first["embedding"], base_url, model_name
-                    )
+                    return _validate_embedding_vector(first["embedding"], base_url, model_name)
 
             if payload.get("embeddings"):
                 first = payload["embeddings"][0]
@@ -355,15 +352,14 @@ class _ChunkingEmbeddingWrapper(BaseEmbedding):
 
             raise EmbeddingServiceError(
                 "Embedding request to {url} failed for model '{model}'. "
-                "Ensure the Ollama daemon is reachable and the embedding model is healthy."
-                .format(url=base_url, model=model_name)
+                "Ensure the Ollama daemon is reachable and the embedding model is healthy.".format(
+                    url=base_url, model=model_name
+                )
             )
 
         for payload in payloads:
             try:
-                response = requests.post(
-                    f"{base_url}/api/embeddings", json=payload, timeout=60
-                )
+                response = requests.post(f"{base_url}/api/embeddings", json=payload, timeout=60)
                 response.raise_for_status()
 
                 try:
@@ -399,8 +395,9 @@ class _ChunkingEmbeddingWrapper(BaseEmbedding):
             last_exc
             or EmbeddingServiceError(
                 "Embedding request to {url} failed for model '{model}'. "
-                "Ensure the Ollama daemon is reachable and the embedding model is healthy."
-                .format(url=base_url, model=model_name)
+                "Ensure the Ollama daemon is reachable and the embedding model is healthy.".format(
+                    url=base_url, model=model_name
+                )
             ),
             self,
         )
@@ -440,10 +437,7 @@ def _ensure_embedding_model_available(embed_model) -> None:
                 " configuration.".format(url=base_url)
             )
 
-        if (
-            available_models is not None
-            and normalized_model_name not in available_models
-        ):
+        if available_models is not None and normalized_model_name not in available_models:
             raise MissingEmbeddingModelError(
                 "Ollama embedding model '{model}' is not available at {url}. "
                 "Run `ollama pull {model}` and retry chat-with-repo.".format(
@@ -502,9 +496,7 @@ def _rechunk_oversized_nodes(nodes, max_chars: int = _MAX_EMBED_CHARS):
         meta = getattr(node, "metadata", None) or getattr(node, "extra_info", None)
         safe_chunk_size = max(max_chars, len(str(meta)) + 1 if meta is not None else max_chars)
         doc = Document(text=content, extra_info=meta if isinstance(meta, dict) else None)
-        splitter = SentenceSplitter(
-            chunk_size=safe_chunk_size, chunk_overlap=safe_chunk_size // 10
-        )
+        splitter = SentenceSplitter(chunk_size=safe_chunk_size, chunk_overlap=safe_chunk_size // 10)
         new_nodes = splitter.get_nodes_from_documents([doc])
 
         if not new_nodes or all(
@@ -596,9 +588,7 @@ class VectorStoreManager:
         all_nodes = []
         for i, doc in enumerate(documents):
             text_content = _extract_doc_text(doc)
-            logger.debug(
-                f"Processing document {i+1}: Content length={len(text_content)}"
-            )
+            logger.debug(f"Processing document {i+1}: Content length={len(text_content)}")
 
             try:
                 # Try semantic splitting first

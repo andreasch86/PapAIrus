@@ -30,8 +30,8 @@ def test_language_validation_rejects_unknown_code():
 
 
 def test_model_restriction():
-    valid = ChatCompletionSettings(model="gemma-local")
-    assert valid.model == "gemma-local"
+    valid = ChatCompletionSettings(model="local-gemma")
+    assert valid.model == "local-gemma"
     valid_gemini = ChatCompletionSettings(model="gemini-2.5-flash", gemini_api_key="key")
     assert valid_gemini.model == "gemini-2.5-flash"
     with pytest.raises(ValidationError):
@@ -42,7 +42,7 @@ def test_gemini_key_required_only_for_gemini():
     with pytest.raises(ValidationError):
         ChatCompletionSettings(model="gemini-2.5-flash", gemini_api_key=None)
 
-    settings = ChatCompletionSettings(model="gemma-local", gemini_api_key=None)
+    settings = ChatCompletionSettings(model="local-gemma", gemini_api_key=None)
     assert settings.gemini_api_key is None
 
 

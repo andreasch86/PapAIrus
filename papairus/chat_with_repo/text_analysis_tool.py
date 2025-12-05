@@ -53,11 +53,11 @@ The output function name or class name should be only one.
 
 
 if __name__ == "__main__":  # pragma: no cover - manual demonstration helper
-    from papairus.llm_provider import VertexGeminiLLM
+    from papairus.llm.backends.gemini import GeminiBackend
 
     api_key = "your_api_key"
     log_file = "your_logfile_path"
-    llm = VertexGeminiLLM(
+    llm = GeminiBackend(
         api_key=api_key,
         base_url="https://aiplatform.googleapis.com/v1",
         model="gemini-2.5-flash",
