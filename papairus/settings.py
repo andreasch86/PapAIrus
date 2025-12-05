@@ -59,7 +59,7 @@ class ChatCompletionSettings(BaseSettings):
     gemini_base_url: str = "https://aiplatform.googleapis.com/v1"
     gemini_api_key: Optional[SecretStr] = Field(None, exclude=True)
     ollama_base_url: str = "http://localhost:11434"
-    ollama_model: str = "gemma2:latest"
+    ollama_model: str = "gemma:2b"
     ollama_embedding_model: str = "nomic-embed-text"
 
     @field_validator("gemini_base_url", mode="before")

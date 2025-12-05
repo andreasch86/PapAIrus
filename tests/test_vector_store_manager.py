@@ -204,6 +204,33 @@ def test_create_vector_store_handles_missing_text(monkeypatch, patched_manager):
     assert patched_manager.query_engine is not None
 
 
+def test_create_vector_store_filters_empty_chunks(monkeypatch, patched_manager):
+    class EmptyNode:
+        def get_content(self, metadata_mode=None):
+            return "   "
+
+    class MixedSplitter:
+        def __init__(self, *args, **kwargs):
+            self.chunk_size = kwargs.get("chunk_size")
+
+        def get_nodes_from_documents(self, docs):
+            return [EmptyNode(), "node-keep"]
+
+    monkeypatch.setattr(
+        "papairus.chat_with_repo.vector_store_manager.SemanticSplitterNodeParser",
+        MixedSplitter,
+    )
+    monkeypatch.setattr(
+        "papairus.chat_with_repo.vector_store_manager.SentenceSplitter",
+        MixedSplitter,
+    )
+
+    patched_manager.create_vector_store(["content"], [{"source": "test"}])
+
+    assert patched_manager.query_engine is not None
+    assert patched_manager.query_engine.retriever.index.nodes == ["node-keep"]
+
+
 def test_fallback_splitter_scales_with_metadata(monkeypatch, patched_manager):
     long_meta = "x" * 5000
     captured = {}
@@ -1057,6 +1084,68 @@ def test_chunking_wrapper_rejects_empty_batch_embedding():
 
     with pytest.raises(EmbeddingServiceError):
         wrapped.get_text_embedding_batch(["text"])
+
+
+def test_chunking_wrapper_rejects_mismatched_batch_length():
+    from papairus.chat_with_repo.vector_store_manager import _ChunkingEmbeddingWrapper
+
+    class BatchOnly:
+        base_url = "http://localhost:11434"
+        model_name = "nomic-embed-text"
+
+        def get_text_embedding_batch(self, texts):
+            # Return fewer embeddings than requested to simulate a service bug.
+            return [[1.0]]
+
+    wrapped = _ChunkingEmbeddingWrapper(BatchOnly(), max_batch_size=2)
+    wrapped._embed_batch_via_http = lambda batch: []  # type: ignore[attr-defined]
+
+    with pytest.raises(EmbeddingServiceError):
+        wrapped.get_text_embedding_batch(["a", "b"])
+
+
+def test_chunking_wrapper_http_branch_raises_on_empty(monkeypatch):
+    from papairus.chat_with_repo.vector_store_manager import _ChunkingEmbeddingWrapper
+
+    class BatchRaises:
+        base_url = "http://localhost:11434"
+        model_name = "nomic-embed-text"
+
+        def get_text_embedding_batch(self, texts):
+            raise RuntimeError("boom")
+
+    wrapped = _ChunkingEmbeddingWrapper(BatchRaises(), max_batch_size=2)
+    monkeypatch.setattr(wrapped, "_embed_batch_via_http", lambda batch: [])
+
+    with pytest.raises(EmbeddingServiceError):
+        wrapped.get_text_embedding_batch(["only-one"])
+
+
+def test_chunking_wrapper_recovers_after_http_retry(monkeypatch):
+    from papairus.chat_with_repo.vector_store_manager import _ChunkingEmbeddingWrapper
+
+    class BatchMismatch:
+        base_url = "http://localhost:11434"
+        model_name = "nomic-embed-text"
+
+        def get_text_embedding_batch(self, texts):
+            return []
+
+    wrapped = _ChunkingEmbeddingWrapper(BatchMismatch(), max_batch_size=4)
+    monkeypatch.setattr(
+        wrapped,
+        "_embed_batch_via_http",
+        lambda batch: [[0.1] for _ in batch],
+    )
+
+    assert wrapped.get_text_embedding_batch(["a", "b"]) == [[0.1], [0.1]]
+
+
+def test_get_node_content_unknown_type_returns_empty():
+    class Unknown:
+        pass
+
+    assert _get_node_content(Unknown()) == ""
 
 
 def test_chunking_wrapper_delegates_attributes():

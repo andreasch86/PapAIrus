@@ -181,7 +181,12 @@ class _ChunkingEmbeddingWrapper(BaseEmbedding):
 
         try:
             if hasattr(wrapped, "get_text_embedding"):
-                return wrapped.get_text_embedding(text)
+                embedding = wrapped.get_text_embedding(text)
+                return _validate_embedding_vector(
+                    embedding,
+                    getattr(self, "base_url", None),
+                    getattr(self, "model_name", None),
+                )
         except Exception:
             # Fall back to the HTTP embeddings endpoint when the wrapped model fails
             # (e.g., incompatible client or API change).
@@ -207,8 +212,23 @@ class _ChunkingEmbeddingWrapper(BaseEmbedding):
                 batch = text_list[start : start + self._max_batch_size]
                 try:
                     batch_embeddings = wrapped.get_text_embedding_batch(batch)
+                    source = "wrapped"
                 except Exception:
                     batch_embeddings = self._embed_batch_via_http(batch)
+                    source = "http"
+
+                if not batch_embeddings or len(batch_embeddings) != len(batch):
+                    if source != "http":
+                        batch_embeddings = self._embed_batch_via_http(batch)
+                    if not batch_embeddings or len(batch_embeddings) != len(batch):
+                        raise EmbeddingServiceError(
+                            "Embedding request to {url} failed for model '{model}'. "
+                            "Received an empty embedding payload from the service.".format(
+                                url=getattr(self, "base_url", None)
+                                or "the configured Ollama host",
+                                model=getattr(self, "model_name", None),
+                            )
+                        )
 
                 for emb in batch_embeddings:
                     embeddings.append(
@@ -386,6 +406,9 @@ def _get_node_content(node) -> str:
     if text_value:
         return text_value
 
+    if isinstance(node, str):
+        return node
+
     return ""
 
 
@@ -529,9 +552,19 @@ class VectorStoreManager:
                 nodes = base_splitter.get_nodes_from_documents([doc])
                 logger.debug(f"Document {i+1} split into {len(nodes)} sentence chunks.")
 
-            all_nodes.extend(nodes)
+            filtered = [node for node in nodes if _get_node_content(node).strip()]
+
+            dropped = len(nodes) - len(filtered)
+            if dropped:
+                logger.debug(
+                    "Dropped %s empty chunks for document %s before indexing.", dropped, i + 1
+                )
+
+            all_nodes.extend(filtered)
 
         all_nodes = _rechunk_oversized_nodes(all_nodes)
+
+        all_nodes = [node for node in all_nodes if _get_node_content(node).strip()]
 
         if not all_nodes:
             logger.warning("No valid nodes to add to the index after chunking.")
