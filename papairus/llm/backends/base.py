@@ -105,8 +105,17 @@ class LLMBackend(ABC):
         return self.generate_response(normalized)
 
     def complete(self, prompt: str, **_: object):
-        response = self.generate_response([ChatMessage(role="user", content=prompt)])
-        return SimpleNamespace(text=response.message.content)
+        return SimpleNamespace(text=self.predict(prompt))
+
+    def predict(self, prompt: str, **_: object) -> str:
+        """Compatibility shim for llama-index completion calls."""
+
+        messages: list[ChatMessage] = []
+        if self.system_prompt:
+            messages.append(ChatMessage(role="system", content=self.system_prompt))
+        messages.append(ChatMessage(role="user", content=prompt))
+        response = self.generate_response(messages)
+        return response.message.content
 
     def _normalize_messages(
         self, messages: Sequence[ChatMessage | SimpleNamespace | dict | str]
