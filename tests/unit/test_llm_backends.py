@@ -4,7 +4,7 @@ import pytest
 import requests
 
 from papairus.llm.backends.base import ChatMessage
-from papairus.llm.backends.local_gemma import LocalGemmaBackend
+from papairus.llm.backends.codegemma import CodegemmaBackend
 from papairus.llm_provider import build_llm
 from papairus.settings import ChatCompletionSettings
 
@@ -41,11 +41,11 @@ def test_local_gemma_autopull(monkeypatch, auto_pull):
     pull_called = {"pull": 0, "chat": 0}
     tag_states = iter([
         {"models": []},
-        {"models": [{"name": "codegemma:instruct"}]},
+        {"models": [{"name": "codegemma:7b-instruct-q4_K_M"}]},
     ])
 
     def fake_get(url, timeout):
-        return FakeResponse(next(tag_states, {"models": [{"name": "codegemma:instruct"}]}))
+        return FakeResponse(next(tag_states, {"models": [{"name": "codegemma:7b-instruct-q4_K_M"}]}))
 
     def fake_post(url, json, timeout):
         if url.endswith("/api/pull"):
@@ -57,11 +57,11 @@ def test_local_gemma_autopull(monkeypatch, auto_pull):
             {"message": {"content": "ok"}, "eval_count": 2, "prompt_eval_count": 1}, 200
         )
 
-    monkeypatch.setattr("papairus.llm.backends.local_gemma.requests.get", fake_get)
-    monkeypatch.setattr("papairus.llm.backends.local_gemma.requests.post", fake_post)
+    monkeypatch.setattr("papairus.llm.backends.codegemma.requests.get", fake_get)
+    monkeypatch.setattr("papairus.llm.backends.codegemma.requests.post", fake_post)
 
-    backend = LocalGemmaBackend(
-        model="codegemma:instruct", base_url="http://localhost:11434", auto_pull=auto_pull
+    backend = CodegemmaBackend(
+        model="codegemma:7b-instruct-q4_K_M", base_url="http://localhost:11434", auto_pull=auto_pull
     )
 
     response = backend.generate_response([ChatMessage(role="user", content="hi")])
@@ -75,15 +75,15 @@ def test_local_gemma_autopull(monkeypatch, auto_pull):
 
 def test_local_gemma_non_json_response(monkeypatch):
     def fake_get(url, timeout):
-        return FakeResponse({"models": [{"name": "codegemma:instruct"}]})
+        return FakeResponse({"models": [{"name": "codegemma:7b-instruct-q4_K_M"}]})
 
     def fake_post(url, json, timeout):
         return FakeResponse("not json\n{ malformed }", json_raises=True)
 
-    monkeypatch.setattr("papairus.llm.backends.local_gemma.requests.get", fake_get)
-    monkeypatch.setattr("papairus.llm.backends.local_gemma.requests.post", fake_post)
+    monkeypatch.setattr("papairus.llm.backends.codegemma.requests.get", fake_get)
+    monkeypatch.setattr("papairus.llm.backends.codegemma.requests.post", fake_post)
 
-    backend = LocalGemmaBackend(model="codegemma:instruct")
+    backend = CodegemmaBackend(model="codegemma:7b-instruct-q4_K_M")
 
     with pytest.raises(RuntimeError):
         backend.generate_response([ChatMessage(role="user", content="hi")])
@@ -91,7 +91,7 @@ def test_local_gemma_non_json_response(monkeypatch):
 
 def test_local_gemma_normalizes_non_string_content(monkeypatch):
     def fake_get(url, timeout):
-        return FakeResponse({"models": [{"name": "codegemma:instruct"}]})
+        return FakeResponse({"models": [{"name": "codegemma:7b-instruct-q4_K_M"}]})
 
     captured_payload = {}
 
@@ -101,14 +101,14 @@ def test_local_gemma_normalizes_non_string_content(monkeypatch):
             {"message": {"content": "ok"}, "eval_count": 2, "prompt_eval_count": 1}, 200
         )
 
-    monkeypatch.setattr("papairus.llm.backends.local_gemma.requests.get", fake_get)
-    monkeypatch.setattr("papairus.llm.backends.local_gemma.requests.post", fake_post)
+    monkeypatch.setattr("papairus.llm.backends.codegemma.requests.get", fake_get)
+    monkeypatch.setattr("papairus.llm.backends.codegemma.requests.post", fake_post)
 
     class DummyTemplate:
         def __str__(self):  # pragma: no cover - trivial
             return "templated"
 
-    backend = LocalGemmaBackend(model="codegemma:instruct")
+    backend = CodegemmaBackend(model="codegemma:7b-instruct-q4_K_M")
     response = backend.generate_response(
         [ChatMessage(role="user", content=DummyTemplate())]
     )
@@ -118,10 +118,10 @@ def test_local_gemma_normalizes_non_string_content(monkeypatch):
 
 
 def test_llm_metadata_defaults():
-    backend = LocalGemmaBackend(model="codegemma:instruct")
+    backend = CodegemmaBackend(model="codegemma:7b-instruct-q4_K_M")
     metadata = backend.metadata
 
     assert metadata.context_window == 8192
     assert metadata.num_output == 1024
-    assert metadata.model_name == "codegemma:instruct"
+    assert metadata.model_name == "codegemma:7b-instruct-q4_K_M"
     assert metadata.is_chat_model is True

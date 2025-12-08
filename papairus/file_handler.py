@@ -14,8 +14,7 @@ from papairus.utils.meta_info_utils import latest_verison_substring
 
 
 class FileHandler:
-    """
-    """
+    """ """
 
     def __init__(self, repo_path, file_path):
         self.file_path = file_path

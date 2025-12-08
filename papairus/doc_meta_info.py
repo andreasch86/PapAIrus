@@ -1,4 +1,3 @@
-
 from __future__ import annotations
 
 # mypy: ignore-errors
@@ -329,9 +328,7 @@ def find_all_referencer(
 class MetaInfo:
     repo_path: Path = ""  # type: ignore
     document_version: str = ""
-    target_repo_hierarchical_tree: "DocItem" = field(
-        default_factory=lambda: DocItem()
-    )
+    target_repo_hierarchical_tree: "DocItem" = field(default_factory=lambda: DocItem())
     white_list: Any[List] = None
 
     fake_file_reflection: Dict[str, str] = field(default_factory=dict)
@@ -703,9 +700,7 @@ class MetaInfo:
             #     import pdb; pdb.set_trace()
             if "code_content" in now_older_item.content.keys():
                 assert "code_content" in result_item.content.keys()
-                if (
-                    now_older_item.content["code_content"] != result_item.content["code_content"]
-                ):
+                if now_older_item.content["code_content"] != result_item.content["code_content"]:
                     result_item.item_status = DocItemStatus.code_changed
 
             for _, child in now_older_item.children.items():
@@ -728,9 +723,7 @@ class MetaInfo:
             if not (set(new_reference_names) == set(old_reference_names)) and (
                 result_item.item_status == DocItemStatus.doc_up_to_date
             ):
-                if set(new_reference_names) <= set(
-                    old_reference_names
-                ):
+                if set(new_reference_names) <= set(old_reference_names):
                     result_item.item_status = DocItemStatus.referencer_not_exist
                 else:
                     result_item.item_status = DocItemStatus.add_new_referencer

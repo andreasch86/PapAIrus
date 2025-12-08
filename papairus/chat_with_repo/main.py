@@ -1,4 +1,6 @@
+import hashlib
 import time
+from pathlib import Path
 
 from papairus.chat_with_repo.gradio_interface import GradioInterface
 from papairus.chat_with_repo.rag import RepoAssistant
@@ -9,9 +11,9 @@ from papairus.settings import ChatCompletionSettings, SettingsManager
 def _select_repo_chat_settings(settings: ChatCompletionSettings) -> ChatCompletionSettings:
     """Pin chat-with-repo to the CodeGemma instruct model served by Ollama."""
 
-    update = {"model": "local-gemma", "ollama_model": "codegemma:instruct"}
+    update = {"model": "codegemma", "ollama_model": "codegemma:7b-instruct-q4_K_M"}
 
-    if settings.model != "local-gemma" or settings.ollama_model != "codegemma:instruct":
+    if settings.model != "codegemma" or settings.ollama_model != "codegemma:7b-instruct-q4_K_M":
         logger.info(
             "chat-with-repo supports only the Ollama CodeGemma instruct model; forcing configuration."
         )
@@ -19,15 +21,13 @@ def _select_repo_chat_settings(settings: ChatCompletionSettings) -> ChatCompleti
     return settings.model_copy(update=update)
 
 
-import hashlib
-from pathlib import Path
-
 def get_file_hash(file_path):
     hash_md5 = hashlib.md5()
     with open(file_path, "rb") as f:
         for chunk in iter(lambda: f.read(4096), b""):
             hash_md5.update(chunk)
     return hash_md5.hexdigest()
+
 
 def main():
     logger.info("Initializing the PapAIrus chat with doc module.")
@@ -69,8 +69,8 @@ def main():
 
         # Save hash
         if current_hash:
-             hash_file.parent.mkdir(parents=True, exist_ok=True)
-             hash_file.write_text(current_hash)
+            hash_file.parent.mkdir(parents=True, exist_ok=True)
+            hash_file.write_text(current_hash)
 
     # Launch Gradio interface
     GradioInterface(assistant.respond)

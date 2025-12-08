@@ -78,9 +78,9 @@ def _suggest_docs_refresh(repo: git.Repo, docs_path: Path, docs_folder_name: str
 @click.option(
     "--model",
     "-m",
-    default="local-gemma",
+    default="codegemma",
     show_default=True,
-    help="Specifies the model to use for completion (local-gemma or any Gemini model starting with 'gemini-').",
+    help="Specifies the model to use for completion (codegemma or any Gemini model starting with 'gemini-').",
     type=str,
 )
 @click.option(
@@ -291,7 +291,7 @@ def diff():
         return
 
     runner = Runner()
-    if runner.meta_info.in_generation_process:
+    if runner.meta_info.in_generation_process:  # Process already running
         click.echo("This command only supports pre-check")
         raise click.Abort()
 
@@ -370,7 +370,7 @@ def chat_with_repo():
     default=None,
     help=(
         "Model identifier to use for LLM-based docstrings. Defaults to a Gemini"
-        " or local Gemma model based on the backend."
+        " or local codegemma model based on the backend."
     ),
 )
 @click.option(
@@ -406,7 +406,7 @@ def chat_with_repo():
 )
 @click.option(
     "--ollama-model",
-    default="codegemma:instruct",
+    default="codegemma:7b-instruct-q4_K_M",
     show_default=True,
     help="Ollama model name when using the Gemma backend.",
 )
@@ -414,14 +414,7 @@ def chat_with_repo():
     "--force",
     is_flag=True,
     default=False,
-    help="Force update of all docstrings even if they exist.",
-)
-@click.option(
-    "--max-workers",
-    "-j",
-    default=4,
-    show_default=True,
-    help="Number of threads to use for docstring generation.",
+    help="Force update of all docstrings.",
 )
 def generate_docstrings(
     path: Path,
@@ -435,7 +428,6 @@ def generate_docstrings(
     ollama_base_url: str,
     ollama_model: str,
     force: bool,
-    max_workers: int,
 ):
     """Add Google-style docstrings to callables missing complete documentation."""
 
@@ -445,7 +437,7 @@ def generate_docstrings(
     if backend != "ast":
         selected_model = model
         if selected_model is None:
-            selected_model = "gemini-2.5-flash" if backend == "gemini" else "local-gemma"
+            selected_model = "gemini-2.5-flash" if backend == "gemini" else "codegemma"
 
         resolved_gemini_api_key = gemini_api_key or os.getenv("GEMINI_API_KEY")
 
@@ -476,7 +468,7 @@ def generate_docstrings(
         elif status == "skipped":
             click.echo(" -> No docstring changes", err=True)
 
-    updated_files = generator.run(dry_run=dry_run, progress_callback=_progress, max_workers=max_workers)
+    updated_files = generator.run(dry_run=dry_run, progress_callback=_progress)
 
     if not updated_files:
         click.echo("No docstring updates needed.")

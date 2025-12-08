@@ -1,3 +1,4 @@
+import hashlib
 import os
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
@@ -690,6 +691,22 @@ class VectorStoreManager:
         db = chromadb.PersistentClient(path=self.chroma_db_path)
         chroma_collection = db.get_or_create_collection(self.collection_name)
 
+        existing_ids = set(chroma_collection.get()["ids"])
+
+        documents_to_process = []
+
+        for content, meta in zip(md_contents, meta_data):
+            doc_hash = hashlib.sha256((content + str(meta)).encode("utf-8")).hexdigest()
+            # We use doc_hash as the document ID
+            if doc_hash not in existing_ids:
+                doc = Document(text=content, extra_info=meta)
+                doc.id_ = doc_hash
+                documents_to_process.append(doc)
+
+        logger.info(
+            f"Found {len(documents_to_process)} new documents to index out of {len(md_contents)}."
+        )
+
         # Initialize semantic chunker (SimpleNodeParser)
         logger.debug("Initializing semantic chunker (SimpleNodeParser).")
         splitter_factory = lambda: SemanticSplitterNodeParser(  # noqa: E731
@@ -698,67 +715,77 @@ class VectorStoreManager:
             embed_model=self.embed_model,
         )
 
-        documents = [
-            Document(text=content, extra_info=meta) for content, meta in zip(md_contents, meta_data)
-        ]
+        all_nodes = []
+        if documents_to_process:
+            worker_count = self.max_workers or os.cpu_count() or 4
+            worker_count = min(max(1, worker_count), len(documents_to_process))
+            logger.debug(
+                "Processing documents with ThreadPoolExecutor(max_workers=%s).", worker_count
+            )
 
-        worker_count = self.max_workers or os.cpu_count() or 4
-        worker_count = min(max(1, worker_count), len(documents))
-        logger.debug("Processing documents with ThreadPoolExecutor(max_workers=%s).", worker_count)
+            results: dict[int, list] = {}
+            with ThreadPoolExecutor(max_workers=worker_count) as executor:
+                futures = {
+                    executor.submit(self._process_document, idx, doc, splitter_factory): idx
+                    for idx, doc in enumerate(documents_to_process)
+                }
 
-        results: dict[int, list] = {}
-        with ThreadPoolExecutor(max_workers=worker_count) as executor:
-            futures = {
-                executor.submit(self._process_document, idx, doc, splitter_factory): idx
-                for idx, doc in enumerate(documents)
-            }
+                for future in as_completed(futures):
+                    doc_index = futures[future]
+                    try:
+                        results[doc_index] = future.result()
+                    except Exception as exc:  # noqa: BLE001 - propagate for visibility
+                        logger.exception(
+                            "Document %s failed during splitting; aborting vector store creation.",
+                            doc_index + 1,
+                        )
+                        raise exc
 
-            for future in as_completed(futures):
-                doc_index = futures[future]
-                try:
-                    results[doc_index] = future.result()
-                except Exception as exc:  # noqa: BLE001 - propagate for visibility
-                    logger.exception(
-                        "Document %s failed during splitting; aborting vector store creation.",
-                        doc_index + 1,
-                    )
-                    raise exc
+            all_nodes = [node for idx in sorted(results) for node in results[idx]]
 
-        all_nodes = [node for idx in sorted(results) for node in results[idx]]
+            all_nodes = _rechunk_oversized_nodes(all_nodes)
 
-        all_nodes = _rechunk_oversized_nodes(all_nodes)
+            all_nodes = [node for node in all_nodes if _get_node_content(node).strip()]
 
-        all_nodes = [node for node in all_nodes if _get_node_content(node).strip()]
-
-        if not all_nodes:
+        if documents_to_process and not all_nodes:
             logger.warning("No valid nodes to add to the index after chunking.")
-            return
+            if not existing_ids:
+                return
+            # Continue to load existing index
+            documents_to_process = []
 
         logger.debug(f"Number of valid chunks: {len(all_nodes)}")
 
         # Set up ChromaVectorStore and load data
         vector_store = ChromaVectorStore(chroma_collection=chroma_collection)
         storage_context = StorageContext.from_defaults(vector_store=vector_store)
-        while True:
-            try:
-                index = VectorStoreIndex(
-                    all_nodes, storage_context=storage_context, embed_model=self.embed_model
-                )
-                break
-            except Exception as exc:  # noqa: BLE001 - surface friendly guidance
+
+        if documents_to_process:
+            while True:
                 try:
-                    _raise_embedding_model_error(exc, self.embed_model)
-                except MissingEmbeddingModelError:
+                    index = VectorStoreIndex(
+                        all_nodes, storage_context=storage_context, embed_model=self.embed_model
+                    )
+                    break
+                except Exception as exc:  # noqa: BLE001 - surface friendly guidance
+                    try:
+                        _raise_embedding_model_error(exc, self.embed_model)
+                    except MissingEmbeddingModelError:
+                        raise
+                    except EmbeddingServiceError as embed_exc:
+                        if self._current_batch_size() > 1:
+                            logger.warning(
+                                "Embedding failed; retrying with embed batch size=1 to reduce payload."
+                            )
+                            self._reset_embed_model_batch(batch_size=1)
+                            continue
+                        raise embed_exc
                     raise
-                except EmbeddingServiceError as embed_exc:
-                    if self._current_batch_size() > 1:
-                        logger.warning(
-                            "Embedding failed; retrying with embed batch size=1 to reduce payload."
-                        )
-                        self._reset_embed_model_batch(batch_size=1)
-                        continue
-                    raise embed_exc
-                raise
+        else:
+            index = VectorStoreIndex.from_vector_store(
+                vector_store=vector_store, embed_model=self.embed_model
+            )
+
         retriever = VectorIndexRetriever(
             index=index, similarity_top_k=self.similarity_top_k, embed_model=self.embed_model
         )
@@ -771,7 +798,9 @@ class VectorStoreManager:
             response_synthesizer=response_synthesizer,
         )
 
-        logger.info(f"Vector store created and loaded with {len(documents)} documents.")
+        logger.info(
+            f"Vector store created and loaded with {len(documents_to_process)} new documents."
+        )
 
     def query_store(self, query):
         """

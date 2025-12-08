@@ -10,97 +10,47 @@ class ChatEngine:
     ChatEngine is used to generate the doc of functions or classes.
     """
 
-    def __init__(self, project_manager):
+    def __init__(self, project_manager, global_context=None):
         setting = SettingsManager.get_setting()
 
         self.llm = build_llm(setting.chat_completion)
         self.project_manager = project_manager
+        self.global_context = global_context or {}
 
     def build_prompt(self, doc_item: DocItem):
         """Builds and returns the system and user prompts based on the DocItem."""
         setting = SettingsManager.get_setting()
 
         code_info = doc_item.content
-        referenced = len(doc_item.who_reference_me) > 0
-
-        code_type = code_info["type"]
         code_name = code_info["name"]
         code_content = code_info["code_content"]
-        have_return = code_info["have_return"]
         file_path = doc_item.get_full_name()
 
-        def get_referenced_prompt(doc_item: DocItem) -> str:
-            if len(doc_item.reference_who) == 0:
-                return ""
-            prompt = [
-                """As you can see, the code calls the following objects, their code and docs are as following:"""
-            ]
-            for reference_item in doc_item.reference_who:
-                instance_prompt = (
-                    f"""obj: {reference_item.get_full_name()}\nDocument: \n{reference_item.md_content[-1] if len(reference_item.md_content) > 0 else 'None'}\nRaw code:```\n{reference_item.content['code_content'] if 'code_content' in reference_item.content.keys() else ''}\n```"""
-                    + "=" * 10
-                )
-                prompt.append(instance_prompt)
-            return "\n".join(prompt)
+        # Find test content
+        target_name = doc_item.get_file_name().split("/")[-1].replace(".py", "")
+        test_content = "No specific test found."
+        tests_map = self.global_context.get("tests_map", {})
 
-        def get_referencer_prompt(doc_item: DocItem) -> str:
-            if len(doc_item.who_reference_me) == 0:
-                return ""
-            prompt = [
-                """Also, the code has been called by the following objects, their code and docs are as following:"""
-            ]
-            for referencer_item in doc_item.who_reference_me:
-                instance_prompt = (
-                    f"""obj: {referencer_item.get_full_name()}\nDocument: \n{referencer_item.md_content[-1] if len(referencer_item.md_content) > 0 else 'None'}\nRaw code:```\n{referencer_item.content['code_content'] if 'code_content' in referencer_item.content.keys() else 'None'}\n```"""
-                    + "=" * 10
-                )
-                prompt.append(instance_prompt)
-            return "\n".join(prompt)
+        for t_name, t_content in tests_map.items():
+            if target_name in t_name:
+                test_content = t_content[:2000]  # Limit size
+                break
 
-        def get_relationship_description(referencer_content, reference_letter):
-            if referencer_content and reference_letter:
-                return "And please include the reference relationship with its callers and callees in the project from a functional perspective"
-            elif referencer_content:
-                return "And please include the relationship with its callers in the project from a functional perspective."
-            elif reference_letter:
-                return "And please include the relationship with its callees in the project from a functional perspective."
-            else:
-                return ""
-
-        code_type_tell = "Class" if code_type == "ClassDef" else "Function"
-        parameters_or_attribute = "attributes" if code_type == "ClassDef" else "parameters"
-        have_return_tell = (
-            "**Output Example**: Mock up a possible appearance of the code's return value."
-            if have_return
-            else ""
-        )
-        combine_ref_situation = (
-            "and combine it with its calling situation in the project," if referenced else ""
-        )
-
-        referencer_content = get_referencer_prompt(doc_item)
-        reference_letter = get_referenced_prompt(doc_item)
-        has_relationship = get_relationship_description(referencer_content, reference_letter)
-
-        project_structure_prefix = ", and the related hierarchical structure of this project is as follows (The current object is marked with an *):"
+        entry_point = self.global_context.get("entry_point_summary", "No entry point found.")
+        existing_docs = self.global_context.get("existing_docs_sample")
+        if existing_docs:
+            entry_point += f"\n\nExisting Documentation Style Sample:\n{existing_docs}"
 
         return build_repo_documentation_messages(
-            combine_ref_situation=combine_ref_situation,
             file_path=file_path,
-            project_structure_prefix=project_structure_prefix,
-            project_structure=(
-                self.project_manager.project_structure
-                if hasattr(self.project_manager, "project_structure")
-                else ""
+            project_name=self.global_context.get("project_name", "Project"),
+            entry_point_summary=entry_point,
+            usage_context_from_tests=self.global_context.get(
+                "usage_context_from_tests", "No usage context found."
             ),
-            code_type_tell=code_type_tell,
             code_name=code_name,
+            test_content=test_content,
             code_content=code_content,
-            have_return_tell=have_return_tell,
-            has_relationship=has_relationship,
-            reference_letter=reference_letter,
-            referencer_content=referencer_content,
-            parameters_or_attribute=parameters_or_attribute,
             language=setting.project.language,
         )
 

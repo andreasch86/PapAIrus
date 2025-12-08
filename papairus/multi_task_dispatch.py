@@ -13,7 +13,7 @@ class Task:
         self.task_id = task_id
         self.extra_info = extra_info
         self.dependencies = dependencies
-        self.status = 0
+        self.status = 0  # 0: Pending, 1: In Progress, 2: Completed, 3: Failed
 
 
 class TaskManager:
@@ -131,6 +131,7 @@ if __name__ == "__main__":
     def some_function():
         time.sleep(random.random() * 3)
 
+    # Example tasks:
     i1 = task_manager.add_task(some_function, [])  # type: ignore
     i2 = task_manager.add_task(some_function, [])  # type: ignore
     i3 = task_manager.add_task(some_function, [i1])  # type: ignore

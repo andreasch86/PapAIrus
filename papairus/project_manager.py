@@ -43,6 +43,7 @@ class ProjectManager:
 
         path_tree = tree()
 
+        # Process both who_reference_me and reference_who lists
         for path_list in [who_reference_me, reference_who]:
             for path in path_list:
                 parts = path.split(os.sep)
@@ -50,6 +51,7 @@ class ProjectManager:
                 for part in parts:
                     node = node[part]
 
+        # Highlight the document item path
         parts = doc_item_path.split(os.sep)
         parts[-1] = "✳️" + parts[-1]
         node = path_tree

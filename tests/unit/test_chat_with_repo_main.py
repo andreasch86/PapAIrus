@@ -9,17 +9,17 @@ def test_select_repo_chat_settings_overrides_non_gemma():
 
     overridden = chat_main_module._select_repo_chat_settings(settings)
 
-    assert overridden.model == "local-gemma"
-    assert overridden.ollama_model == "codegemma:instruct"
+    assert overridden.model == "codegemma"
+    assert overridden.ollama_model == "codegemma:7b-instruct-q4_K_M"
 
 
 def test_select_repo_chat_settings_keeps_gemma():
-    settings = ChatCompletionSettings(model="local-gemma")
+    settings = ChatCompletionSettings(model="codegemma")
 
     selected = chat_main_module._select_repo_chat_settings(settings)
 
-    assert selected.model == "local-gemma"
-    assert selected.ollama_model == "codegemma:instruct"
+    assert selected.model == "codegemma"
+    assert selected.ollama_model == "codegemma:7b-instruct-q4_K_M"
 
 
 def test_main_executes_with_stubs(monkeypatch, tmp_path):
@@ -28,7 +28,7 @@ def test_main_executes_with_stubs(monkeypatch, tmp_path):
     def fake_get_setting():
         return Setting(
             project=ProjectSettings(target_repo=tmp_path),
-            chat_completion=ChatCompletionSettings(model="local-gemma"),
+            chat_completion=ChatCompletionSettings(model="codegemma"),
         )
 
     monkeypatch.setattr(SettingsManager, "get_setting", staticmethod(fake_get_setting))

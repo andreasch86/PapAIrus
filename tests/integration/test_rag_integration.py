@@ -70,7 +70,7 @@ def patched_dependencies(monkeypatch):
 
 @pytest.fixture()
 def assistant(patched_dependencies, tmp_path):
-    settings = ChatCompletionSettings(model="local-gemma")
+    settings = ChatCompletionSettings(model="codegemma")
     instance = rag_module.RepoAssistant(settings, tmp_path / "db.json")
 
     # Simplify downstream LLM usage to keep the test focused on query handling

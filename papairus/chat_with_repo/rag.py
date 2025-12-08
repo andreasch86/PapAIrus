@@ -78,6 +78,7 @@ class RepoAssistant:
     def list_to_markdown(self, list_items):
         markdown_content = ""
 
+        # Convert list to markdown list
         for index, item in enumerate(list_items, start=1):
             markdown_content += f"{index}. {item}\n"
 

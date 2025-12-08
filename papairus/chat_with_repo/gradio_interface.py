@@ -48,6 +48,7 @@ class GradioInterface:
         self.setup_gradio_interface()
 
     def wrapper_respond(self, msg_input, system_input):  # pragma: no cover
+        # Call respond function
         msg, output1, output2, output3, code, codex = self.respond(msg_input, system_input)
         output1 = markdown.markdown(str(output1))
         output2 = markdown.markdown(str(output2))
