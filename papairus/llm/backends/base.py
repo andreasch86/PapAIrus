@@ -24,6 +24,16 @@ class LLMUsage:
 
 
 @dataclass
+class LLMMetadata:
+    """Lightweight metadata container matching llama-index expectations."""
+
+    model_name: str
+    context_window: int | None = None
+    num_output: int | None = None
+    type: str = "custom"
+
+
+@dataclass
 class LLMResponse:
     """Normalized response with llama-index compatible accessors."""
 
@@ -41,6 +51,16 @@ class LLMResponse:
 
 class LLMBackend(ABC):
     """Abstract base for all LLM backends."""
+
+    @property
+    def metadata(self) -> LLMMetadata:
+        """Return llama-index compatible metadata for the backend."""
+
+        if hasattr(self, "_metadata"):
+            return self._metadata  # type: ignore[attr-defined]
+
+        model_name = getattr(self, "model", "unknown")
+        return LLMMetadata(model_name=model_name, type=self.__class__.__name__.lower())
 
     @abstractmethod
     def generate_response(self, messages: Sequence[ChatMessage]) -> LLMResponse:

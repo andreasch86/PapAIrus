@@ -7,7 +7,7 @@ from typing import Any, Sequence
 import requests
 from requests import HTTPError
 
-from papairus.llm.backends.base import ChatMessage, LLMBackend, LLMResponse, LLMUsage
+from papairus.llm.backends.base import ChatMessage, LLMBackend, LLMMetadata, LLMResponse, LLMUsage
 
 
 class GeminiBackend(LLMBackend):
@@ -25,6 +25,9 @@ class GeminiBackend(LLMBackend):
         self.temperature = temperature
         self.base_url = base_url.rstrip("/")
         self.timeout = timeout
+        self._metadata = LLMMetadata(
+            model_name=model, context_window=None, num_output=None, type="gemini"
+        )
 
     def generate_docstring(
         self,

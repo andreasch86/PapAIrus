@@ -8,7 +8,7 @@ from typing import Any, Sequence
 import requests
 from requests import HTTPError
 
-from papairus.llm.backends.base import ChatMessage, LLMBackend, LLMResponse, LLMUsage
+from papairus.llm.backends.base import ChatMessage, LLMBackend, LLMMetadata, LLMResponse, LLMUsage
 
 
 class LocalGemmaBackend(LLMBackend):
@@ -26,6 +26,9 @@ class LocalGemmaBackend(LLMBackend):
         self.temperature = temperature
         self.timeout = request_timeout
         self.auto_pull = auto_pull
+        self._metadata = LLMMetadata(
+            model_name=model, context_window=None, num_output=None, type="local-gemma"
+        )
 
     def generate_docstring(
         self,
