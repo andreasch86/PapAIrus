@@ -13,7 +13,7 @@ class Task:
         self.task_id = task_id
         self.extra_info = extra_info
         self.dependencies = dependencies
-        self.status = 0  # English：0English，1English，2English，3English
+        self.status = 0  # 0: Pending, 1: In Progress, 2: Completed, 3: Failed
 
 
 class TaskManager:
@@ -97,7 +97,7 @@ class TaskManager:
             for task in self.task_dict.values():
                 if target_task in task.dependencies:
                     task.dependencies.remove(target_task)
-            self.task_dict.pop(task_id)  # English
+            self.task_dict.pop(task_id)
 
 
 def worker(task_manager, process_id: int, handler: Callable):
@@ -128,10 +128,10 @@ def worker(task_manager, process_id: int, handler: Callable):
 if __name__ == "__main__":
     task_manager = TaskManager()
 
-    def some_function():  # English
+    def some_function():
         time.sleep(random.random() * 3)
 
-    # English，English：
+    # Example tasks:
     i1 = task_manager.add_task(some_function, [])  # type: ignore
     i2 = task_manager.add_task(some_function, [])  # type: ignore
     i3 = task_manager.add_task(some_function, [i1])  # type: ignore

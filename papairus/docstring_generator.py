@@ -5,6 +5,8 @@ from __future__ import annotations
 import ast
 import re
 import textwrap
+import threading
+from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Callable, Iterable, List, Optional, Sequence
@@ -46,6 +48,7 @@ class DocstringGenerator:
         backend: str = "ast",
         llm_client: Optional[Any] = None,
         refresh_existing_llm_docstrings: bool = True,
+        force: bool = False,
     ) -> None:
         self.root = Path(root)
         self.excluded_directories = set(
@@ -56,6 +59,7 @@ class DocstringGenerator:
             raise ValueError("backend must be one of: ast, gemini, gemma, llm")
         self.llm_client = llm_client
         self.refresh_existing_llm_docstrings = refresh_existing_llm_docstrings
+        self.force = force
 
     def run(
         self,
@@ -140,7 +144,9 @@ class DocstringGenerator:
         body_indent = " " * (getattr(node, "col_offset", 0) + 4)
 
         needs_update = False
-        if self.backend == "ast":
+        if self.force:
+            needs_update = True
+        elif self.backend == "ast":
              # For AST, we allow all potentially valid nodes to be candidates
              # _build_ast_docstring will check validity and completeness
              needs_update = True
@@ -170,27 +176,36 @@ class DocstringGenerator:
             first_body_line = node.body[0].lineno - 1 if node.body else node.lineno
             edits.append((first_body_line, first_body_line, docstring_lines, False))
 
+    def _process_batch_item(self, batch, source_text, edits, edits_lock):
+        prompt = self._build_batch_prompt(batch, source_text)
+
+        try:
+            response = self._call_llm_raw(prompt)
+            results = self._parse_batch_response(response, [c[0].name for c in batch])
+
+            for (node, indent, existing_doc), docstring in zip(batch, results):
+                if docstring:
+                     # Normalize to remove wrapping quotes if present
+                     cleaned = self._normalize_llm_output(docstring)
+                     lines = self._indent_docstring(cleaned.splitlines(), indent)
+                     with edits_lock:
+                         self._add_edit(node, existing_doc, lines, edits)
+        except Exception:
+            # Log error or silence it (DocstringGenerator shouldn't crash process easily)
+            pass
+
     def _process_batch(self, candidates, source_lines, edits):
         batch_size = 5
         source_text = "".join(source_lines)
+        edits_lock = threading.Lock()
 
+        batches = []
         for i in range(0, len(candidates), batch_size):
-            batch = candidates[i : i + batch_size]
-            prompt = self._build_batch_prompt(batch, source_text)
+            batches.append(candidates[i : i + batch_size])
 
-            try:
-                response = self._call_llm_raw(prompt)
-                results = self._parse_batch_response(response, [c[0].name for c in batch])
-
-                for (node, indent, existing_doc), docstring in zip(batch, results):
-                    if docstring:
-                         # Normalize to remove wrapping quotes if present
-                         cleaned = self._normalize_llm_output(docstring)
-                         lines = self._indent_docstring(cleaned.splitlines(), indent)
-                         self._add_edit(node, existing_doc, lines, edits)
-            except Exception as e:
-                # Log error or silence it (DocstringGenerator shouldn't crash process easily)
-                pass
+        with ThreadPoolExecutor() as executor:
+            # Use map to process in parallel
+            list(executor.map(lambda b: self._process_batch_item(b, source_text, edits, edits_lock), batches))
 
     def _build_batch_prompt(self, batch, source_text):
         header = (

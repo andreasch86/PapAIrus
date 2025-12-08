@@ -51,7 +51,7 @@ class RepoAssistant:
 
         return cleaned_queries
 
-    def rerank(self, query, docs):  # English
+    def rerank(self, query, docs):
         if not docs:
             return []
 
@@ -78,7 +78,7 @@ class RepoAssistant:
     def list_to_markdown(self, list_items):
         markdown_content = ""
 
-        # English，English
+        # Convert list to markdown list
         for index, item in enumerate(list_items, start=1):
             markdown_content += f"{index}. {item}\n"
 

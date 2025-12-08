@@ -23,7 +23,7 @@ class ProjectManager:
             structure.append(prefix + os.path.basename(root))
             new_prefix = prefix + "  "
             for name in sorted(os.listdir(root)):
-                if name.startswith("."):  # English
+                if name.startswith("."):
                     continue
                 path = os.path.join(root, name)
                 if os.path.isdir(path):
@@ -43,7 +43,7 @@ class ProjectManager:
 
         path_tree = tree()
 
-        # English who_reference_me English reference_who English
+        # Process both who_reference_me and reference_who lists
         for path_list in [who_reference_me, reference_who]:
             for path in path_list:
                 parts = path.split(os.sep)
@@ -51,9 +51,9 @@ class ProjectManager:
                 for part in parts:
                     node = node[part]
 
-        # English doc_item_path
+        # Highlight the document item path
         parts = doc_item_path.split(os.sep)
-        parts[-1] = "✳️" + parts[-1]  # English
+        parts[-1] = "✳️" + parts[-1]
         node = path_tree
         for part in parts:
             node = node[part]

@@ -44,12 +44,20 @@ class DummySplitter:
         return [f"node-{idx}" for idx, _ in enumerate(docs)]
 
 
+class DummyCollection:
+    def __init__(self, name):
+        self.name = name
+
+    def get(self, *args, **kwargs):
+        return {"ids": []}
+
+
 class DummyPersistentClient:
     def __init__(self, path):
         self.path = path
 
     def get_or_create_collection(self, name):
-        return {"name": name}
+        return DummyCollection(name)
 
 
 class DummyChromaVectorStore:
