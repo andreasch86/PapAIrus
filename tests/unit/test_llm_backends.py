@@ -96,3 +96,4 @@ def test_llm_metadata_defaults():
     assert metadata.context_window == 8192
     assert metadata.num_output == 1024
     assert metadata.model_name == "codegemma:instruct"
+    assert metadata.is_chat_model is True

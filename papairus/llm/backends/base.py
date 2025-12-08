@@ -31,6 +31,7 @@ class LLMMetadata:
     context_window: int = 8192
     num_output: int = 1024
     type: str = "custom"
+    is_chat_model: bool = True
 
 
 @dataclass
@@ -62,6 +63,8 @@ class LLMBackend(ABC):
                 meta.context_window = LLMMetadata.context_window
             if meta.num_output is None:
                 meta.num_output = LLMMetadata.num_output
+            if meta.is_chat_model is None:
+                meta.is_chat_model = True
             return meta
 
         model_name = getattr(self, "model", "unknown")
