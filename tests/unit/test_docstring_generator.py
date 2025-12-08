@@ -156,6 +156,33 @@ def test_llm_backend_strips_language_hints_and_recovers_docstring(tmp_path):
     assert ast.get_docstring(class_node) == "A class to track usage."
 
 
+def test_llm_backend_refreshes_existing_docstrings(tmp_path):
+    sample = tmp_path / "llm_refresh_existing.py"
+    sample.write_text('def div(a, b):\n    """Divide two values."""\n    return a / b\n')
+
+    class RefreshingLLM(LLMBackend):
+        def generate_response(self, messages):  # pragma: no cover - not used
+            return None
+
+        def generate_docstring(
+            self, code_snippet: str, *, style: str = "google", existing_docstring=None
+        ):
+            return (
+                """Compute division while guarding zero values.\n\n"
+                "Args:\n    a (Any): Dividend.\n    b (Any): Divisor.\n"
+                "Returns:\n    Any: The division result.\n"
+                "Raises:\n    ZeroDivisionError: If b is zero.\n"""
+            )
+
+    generator = DocstringGenerator(tmp_path, backend="gemma", llm_client=RefreshingLLM())
+    updated = generator.run()
+
+    assert sample in updated
+    content = sample.read_text()
+    assert "Compute division while guarding zero values." in content
+    assert "ZeroDivisionError" in content
+
+
 def test_progress_callback_reports_status(tmp_path):
     sample = tmp_path / "progress_sample.py"
     sample.write_text("def hello(name):\n    return name\n")

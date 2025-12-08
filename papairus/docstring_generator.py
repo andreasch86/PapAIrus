@@ -45,6 +45,7 @@ class DocstringGenerator:
         excluded_directories: Optional[Sequence[str]] = None,
         backend: str = "ast",
         llm_client: Optional[Any] = None,
+        refresh_existing_llm_docstrings: bool = True,
     ) -> None:
         self.root = Path(root)
         self.excluded_directories = set(
@@ -54,6 +55,7 @@ class DocstringGenerator:
         if self.backend not in {"ast", "gemini", "gemma", "llm"}:
             raise ValueError("backend must be one of: ast, gemini, gemma, llm")
         self.llm_client = llm_client
+        self.refresh_existing_llm_docstrings = refresh_existing_llm_docstrings
 
     def run(
         self,
@@ -203,15 +205,19 @@ class DocstringGenerator:
         parameters: Sequence[ParameterDoc] = []
         return_info: Optional[ReturnDoc] = None
 
+        refresh_existing = self.refresh_existing_llm_docstrings
+
         if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
             parameters = self._extract_parameters(node)
             return_info = self._extract_returns(node)
             needs_return = return_info is not None
-            needs_update = existing_docstring is None or self._docstring_incomplete(
-                existing_docstring, parameters, needs_return
-            )
+            needs_update = refresh_existing or existing_docstring is None
+            if not needs_update:
+                needs_update = self._docstring_incomplete(
+                    existing_docstring, parameters, needs_return
+                )
         elif isinstance(node, ast.ClassDef):
-            needs_update = existing_docstring is None
+            needs_update = refresh_existing or existing_docstring is None
         else:
             return None
 
