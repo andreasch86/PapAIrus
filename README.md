@@ -102,7 +102,7 @@ After running `papairus create-documentation` at least once:
 # Launches a Gradio interface at http://localhost:7860/ by default
 papairus chat-with-repo
 ```
-Model selection follows the same Gemini/Gemma rules as the CLI. The chat pipeline injects repository context before sending prompts to the configured backend.
+`chat-with-repo` always uses the local CodeGemma instruct model served by Ollama (auto-pulled if missing). The chat pipeline injects repository context before sending prompts, so ensure the Ollama service is running and has network access to download `codegemma:instruct` on first launch.
 
 ### Render GitBooks for the generated Markdown
 Use the `display/` helpers to build and serve a GitBook from the Markdown docs:

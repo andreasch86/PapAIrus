@@ -53,16 +53,13 @@ The output function name or class name should be only one.
 
 
 if __name__ == "__main__":  # pragma: no cover - manual demonstration helper
-    from papairus.llm.backends.gemini import GeminiBackend
+    from papairus.llm.backends.local_gemma import LocalGemmaBackend
 
-    api_key = "your_api_key"
-    log_file = "your_logfile_path"
-    llm = GeminiBackend(
-        api_key=api_key,
-        base_url="https://aiplatform.googleapis.com/v1",
-        model="gemini-2.5-flash",
+    llm = LocalGemmaBackend(
+        model="codegemma:instruct",
+        base_url="http://localhost:11434",
         temperature=0.2,
-        timeout=60,
+        request_timeout=60,
     )
     db_path = "your_database_path"
     test = TextAnalysisTool(llm, db_path)
