@@ -9,9 +9,9 @@ from papairus.settings import ChatCompletionSettings, SettingsManager
 def _select_repo_chat_settings(settings: ChatCompletionSettings) -> ChatCompletionSettings:
     """Pin chat-with-repo to the CodeGemma instruct model served by Ollama."""
 
-    update = {"model": "local-gemma", "ollama_model": "codegemma:instruct"}
+    update = {"model": "codegemma", "ollama_model": "codegemma:7b-instruct-q4_K_M"}
 
-    if settings.model != "local-gemma" or settings.ollama_model != "codegemma:instruct":
+    if settings.model != "codegemma" or settings.ollama_model != "codegemma:7b-instruct-q4_K_M":
         logger.info(
             "chat-with-repo supports only the Ollama CodeGemma instruct model; forcing configuration."
         )

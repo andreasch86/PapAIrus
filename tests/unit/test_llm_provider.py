@@ -10,7 +10,7 @@ from papairus.settings import ChatCompletionSettings
 
 def test_build_llm_uses_local_gemma():
     settings = ChatCompletionSettings(
-        model="local-gemma",
+        model="codegemma",
         request_timeout=45,
         temperature=0.7,
         gemini_api_key=None,
@@ -20,9 +20,9 @@ def test_build_llm_uses_local_gemma():
 
     llm = build_llm(settings)
 
-    from papairus.llm.backends.local_gemma import LocalGemmaBackend
+    from papairus.llm.backends.codegemma import CodegemmaBackend
 
-    assert isinstance(llm, LocalGemmaBackend)
+    assert isinstance(llm, CodegemmaBackend)
     assert llm.model == "gemma2:2b"
     assert llm.base_url == "http://ollama:11434"
     assert llm.temperature == 0.7
@@ -38,7 +38,7 @@ def test_build_embedding_model_for_gemma(monkeypatch):
     monkeypatch.setattr("papairus.llm_provider.OllamaEmbedding", FakeOllamaEmbedding)
 
     settings = ChatCompletionSettings(
-        model="local-gemma",
+        model="codegemma",
         gemini_api_key=None,
         ollama_base_url="http://ollama:11434",
         ollama_embedding_model="gemma-embed:latest",
@@ -56,7 +56,7 @@ def test_build_embedding_model_for_gemma(monkeypatch):
 def test_build_embedding_model_for_gemma_missing_dep(monkeypatch):
     monkeypatch.setattr("papairus.llm_provider.OllamaEmbedding", None)
 
-    settings = ChatCompletionSettings(model="local-gemma")
+    settings = ChatCompletionSettings(model="codegemma")
 
     with pytest.raises(ImportError) as excinfo:
         build_embedding_model(settings)

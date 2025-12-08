@@ -13,8 +13,8 @@ except ImportError:  # pragma: no cover - optional dependency
     OllamaEmbedding = None  # type: ignore
 
 from papairus.llm.backends.base import LLMBackend
+from papairus.llm.backends.codegemma import CodegemmaBackend
 from papairus.llm.backends.gemini import GeminiBackend
-from papairus.llm.backends.local_gemma import LocalGemmaBackend
 from papairus.settings import ChatCompletionSettings
 
 
@@ -29,8 +29,8 @@ def _resolve_engine(settings: ChatCompletionSettings) -> str:
         return settings.engine
     if settings.model.startswith("gemini-"):
         return "gemini"
-    if settings.model == "local-gemma":
-        return "local_gemma"
+    if settings.model == "codegemma":
+        return "codegemma"
     raise ValueError(f"Unsupported model configured: {settings.model}")
 
 
@@ -51,8 +51,8 @@ def build_llm(settings: ChatCompletionSettings) -> LLMBackend:
             timeout=settings.request_timeout,
         )
 
-    if engine == "local_gemma":
-        return LocalGemmaBackend(
+    if engine == "codegemma":
+        return CodegemmaBackend(
             model=settings.ollama_model,
             base_url=settings.ollama_base_url,
             temperature=settings.temperature,
@@ -73,7 +73,7 @@ def build_embedding_model(chat_settings: ChatCompletionSettings):
             api_key=chat_settings.gemini_api_key.get_secret_value(),  # type: ignore[union-attr]
         )
 
-    if engine == "local_gemma":
+    if engine == "codegemma":
         try:
             ollama_embedding_cls = _require_dependency(
                 OllamaEmbedding, "llama-index-embeddings-ollama"

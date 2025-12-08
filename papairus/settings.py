@@ -53,13 +53,13 @@ class ProjectSettings(BaseSettings):
 
 class ChatCompletionSettings(BaseSettings):
     engine: Optional[str] = None
-    model: str = "local-gemma"  # Local Gemma (via Ollama) by default; Gemini allowed explicitly.
+    model: str = "codegemma"  # Local Gemma (via Ollama) by default; Gemini allowed explicitly.
     temperature: PositiveFloat = 0.2
     request_timeout: PositiveInt = 60
     gemini_base_url: str = "https://aiplatform.googleapis.com/v1"
     gemini_api_key: Optional[SecretStr] = Field(None, exclude=True)
     ollama_base_url: str = "http://localhost:11434"
-    ollama_model: str = "codegemma:instruct"
+    ollama_model: str = "codegemma:7b-instruct-q4_K_M"
     ollama_embedding_model: str = "nomic-embed-text"
     ollama_auto_pull: bool = True
 
@@ -78,10 +78,10 @@ class ChatCompletionSettings(BaseSettings):
     def validate_model(cls, value: str) -> str:
         if value.startswith("gemini-"):
             return value
-        if value == "local-gemma" or value.startswith("local-gemma"):
-            return "local-gemma"
+        if value == "codegemma" or value.startswith("codegemma"):
+            return "codegemma"
         raise ValueError(
-            "Model must be local-gemma (self-hosted) or a Gemini model name starting with 'gemini-'."
+            "Model must be codegemma (self-hosted) or a Gemini model name starting with 'gemini-'."
         )
 
     @field_validator("gemini_api_key")

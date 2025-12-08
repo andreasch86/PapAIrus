@@ -11,7 +11,7 @@ from requests import HTTPError
 from papairus.llm.backends.base import ChatMessage, LLMBackend, LLMMetadata, LLMResponse, LLMUsage
 
 
-class LocalGemmaBackend(LLMBackend):
+class CodegemmaBackend(LLMBackend):
     def __init__(
         self,
         *,
@@ -28,7 +28,7 @@ class LocalGemmaBackend(LLMBackend):
         self.timeout = request_timeout
         self.auto_pull = auto_pull
         self._metadata = LLMMetadata(
-            model_name=model, context_window=8192, num_output=1024, type="local-gemma"
+            model_name=model, context_window=8192, num_output=1024, type="codegemma"
         )
 
     def generate_docstring(

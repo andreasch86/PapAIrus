@@ -34,7 +34,9 @@ class Runner:
             project_hierarchy=self.setting.project.hierarchy_name,
         )
         self.change_detector = ChangeDetector(repo_path=self.setting.project.target_repo)
-        self.chat_engine = ChatEngine(project_manager=self.project_manager)
+
+        global_context = self.gather_global_context()
+        self.chat_engine = ChatEngine(project_manager=self.project_manager, global_context=global_context)
 
         if not self.absolute_project_hierarchy_path.exists():
             file_path_reflections, jump_files = make_fake_files()
@@ -47,6 +49,66 @@ class Runner:
             target_dir_path=self.absolute_project_hierarchy_path
         )
         self.runner_lock = threading.Lock()
+
+    def gather_global_context(self):
+        project_root = self.setting.project.target_repo
+
+        context = {
+            "project_name": project_root.name,
+            "entry_point_summary": "Entry point analysis pending.",
+            "usage_context_from_tests": "Integration tests analysis pending.",
+            "tests_map": {}
+        }
+
+        # 1. README
+        readme_path = project_root / "README.md"
+        if readme_path.exists():
+            context["readme"] = readme_path.read_text(errors="ignore")
+
+        # 2. Entry point
+        for name in ["main.py", "app.py", "manage.py", "cli.py"]:
+            p = project_root / name
+            if p.exists():
+                context["entry_point_summary"] = f"Entry point ({name}):\n" + p.read_text(errors="ignore")[:2000]
+                break
+
+        # 3. Tests
+        tests_path = project_root / "tests"
+        if tests_path.exists():
+            integration_tests = list(tests_path.rglob("*integration*/*.py"))
+            unit_tests = list(tests_path.rglob("test_*.py"))
+
+            # Usage context from integration tests
+            usage_context = []
+            for t in integration_tests[:3]:
+                 usage_context.append(f"--- {t.name} ---\n{t.read_text(errors='ignore')[:2000]}")
+
+            if usage_context:
+                context["usage_context_from_tests"] = "\n".join(usage_context)
+            else:
+                 # Fallback to some unit tests if no integration tests
+                 for t in unit_tests[:3]:
+                     usage_context.append(f"--- {t.name} ---\n{t.read_text(errors='ignore')[:2000]}")
+                 context["usage_context_from_tests"] = "\n".join(usage_context)
+
+            # Map for specific file tests
+            for t in integration_tests + unit_tests:
+                context["tests_map"][t.name] = t.read_text(errors="ignore")
+
+        # 4. Existing Docs Analysis (Create if missing)
+        docs_path = project_root / self.setting.project.markdown_docs_name
+        if not docs_path.exists():
+            docs_path.mkdir(parents=True, exist_ok=True)
+        else:
+            md_files = sorted(list(docs_path.rglob("*.md")))
+            if md_files:
+                docs_sample = []
+                for md in md_files[:2]:
+                    docs_sample.append(f"--- {md.name} ---\n{md.read_text(errors='ignore')[:1000]}")
+                if docs_sample:
+                    context["existing_docs_sample"] = "\n".join(docs_sample)
+
+        return context
 
     def get_all_pys(self, directory):
         """
@@ -356,8 +418,9 @@ class Runner:
             code_info = file_handler.get_obj_code_info(
                 structure_type, name, start_line, end_line, parent, params
             )
-            response_message = self.chat_engine.generate_doc(code_info, file_handler)
-            md_content = response_message.content
+            doc_item = DocItem(obj_name=name, content=code_info)
+            # Manually set item_type if possible, but DocItem defaults to _class_function
+            md_content = self.chat_engine.generate_doc(doc_item)
             code_info["md_content"] = md_content
             # Englishfile_dictEnglish
             file_dict[name] = code_info
@@ -546,8 +609,9 @@ class Runner:
         """
         if obj_name in file_dict:
             obj = file_dict[obj_name]
-            response_message = self.chat_engine.generate_doc(obj, file_handler, obj_referencer_list)
-            obj["md_content"] = response_message.content
+            doc_item = DocItem(obj_name=obj_name, content=obj)
+            response_message = self.chat_engine.generate_doc(doc_item)
+            obj["md_content"] = response_message
 
     def get_new_objects(self, file_handler):
         """

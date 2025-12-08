@@ -78,9 +78,9 @@ def _suggest_docs_refresh(repo: git.Repo, docs_path: Path, docs_folder_name: str
 @click.option(
     "--model",
     "-m",
-    default="local-gemma",
+    default="codegemma",
     show_default=True,
-    help="Specifies the model to use for completion (local-gemma or any Gemini model starting with 'gemini-').",
+    help="Specifies the model to use for completion (codegemma or any Gemini model starting with 'gemini-').",
     type=str,
 )
 @click.option(
@@ -370,7 +370,7 @@ def chat_with_repo():
     default=None,
     help=(
         "Model identifier to use for LLM-based docstrings. Defaults to a Gemini"
-        " or local Gemma model based on the backend."
+        " or local codegemma model based on the backend."
     ),
 )
 @click.option(
@@ -406,7 +406,7 @@ def chat_with_repo():
 )
 @click.option(
     "--ollama-model",
-    default="codegemma:instruct",
+    default="codegemma:7b-instruct-q4_K_M",
     show_default=True,
     help="Ollama model name when using the Gemma backend.",
 )
@@ -430,7 +430,7 @@ def generate_docstrings(
     if backend != "ast":
         selected_model = model
         if selected_model is None:
-            selected_model = "gemini-2.5-flash" if backend == "gemini" else "local-gemma"
+            selected_model = "gemini-2.5-flash" if backend == "gemini" else "codegemma"
 
         resolved_gemini_api_key = gemini_api_key or os.getenv("GEMINI_API_KEY")
 

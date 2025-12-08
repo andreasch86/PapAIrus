@@ -30,8 +30,8 @@ def test_language_validation_rejects_unknown_code():
 
 
 def test_model_restriction():
-    valid = ChatCompletionSettings(model="local-gemma")
-    assert valid.model == "local-gemma"
+    valid = ChatCompletionSettings(model="codegemma")
+    assert valid.model == "codegemma"
     valid_gemini = ChatCompletionSettings(model="gemini-2.5-flash", gemini_api_key="key")
     assert valid_gemini.model == "gemini-2.5-flash"
     with pytest.raises(ValidationError):
@@ -42,7 +42,7 @@ def test_gemini_key_required_only_for_gemini():
     with pytest.raises(ValidationError):
         ChatCompletionSettings(model="gemini-2.5-flash", gemini_api_key=None)
 
-    settings = ChatCompletionSettings(model="local-gemma", gemini_api_key=None)
+    settings = ChatCompletionSettings(model="codegemma", gemini_api_key=None)
     assert settings.gemini_api_key is None
 
 
@@ -76,7 +76,7 @@ def test_settings_manager_initialization(temp_repo):
     # Uses fixture to preconfigure settings
     setting = SettingsManager.get_setting()
     assert setting.project.target_repo.exists()
-    assert setting.chat_completion.model == "local-gemma"
+    assert setting.chat_completion.model == "codegemma"
 
 
 def test_settings_manager_initialize_with_params_sets_instance(tmp_path):
@@ -90,7 +90,7 @@ def test_settings_manager_initialize_with_params_sets_instance(tmp_path):
         language="English",
         max_thread_count=2,
         log_level="INFO",
-        model="local-gemma",
+        model="codegemma",
         temperature=0.3,
         request_timeout=30,
         gemini_base_url="https://example.com",
