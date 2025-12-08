@@ -29,9 +29,7 @@ class TextAnalysisTool:
 
     def list_to_markdown(self, search_result):
         markdown_str = ""
-        # English，EnglishMarkdownEnglish
         for index, content in enumerate(search_result, start=1):
-            # EnglishMarkdownEnglish，English
             markdown_str += f"{index}. {content}\n\n"
 
         return markdown_str

@@ -1,4 +1,3 @@
-# FileHandler English，English，EnglishmarkdownEnglishpythonEnglish
 # papairus/file_handler.py
 import ast
 import json
@@ -15,12 +14,10 @@ from papairus.utils.meta_info_utils import latest_verison_substring
 
 
 class FileHandler:
-    """
-    English，English（English）English
-    """
+    """ """
 
     def __init__(self, repo_path, file_path):
-        self.file_path = file_path  # Englishfile_pathEnglish
+        self.file_path = file_path
         self.repo_path = repo_path
 
         setting = SettingsManager.get_setting()
@@ -71,16 +68,13 @@ class FileHandler:
         ) as code_file:
             lines = code_file.readlines()
             code_content = "".join(lines[start_line - 1 : end_line])
-            # English
             name_column = lines[start_line - 1].find(code_name)
-            # EnglishreturnEnglish
             if "return" in code_content:
                 have_return = True
             else:
                 have_return = False
 
             code_info["have_return"] = have_return
-            # # English json.dumps English，English
             # code_info['code_content'] = json.dumps(code_content)[1:-1]
             code_info["code_content"] = code_content
             code_info["name_column"] = name_column
@@ -95,9 +89,7 @@ class FileHandler:
             file_path (str): The relative path of the file.
             content (str): The content to be written to the file.
         """
-        # Englishfile_pathEnglish
         if file_path.startswith("/"):
-            # English '/'
             file_path = file_path[1:]
 
         abs_file_path = os.path.join(self.repo_path, file_path)
@@ -144,12 +136,12 @@ class FileHandler:
             int: The end line number of the node. Returns -1 if the node does not have a line number.
         """
         if not hasattr(node, "lineno"):
-            return -1  # English-1English
+            return -1
 
         end_lineno = node.lineno
         for child in ast.iter_child_nodes(node):
             child_end = getattr(child, "end_lineno", None) or self.get_end_lineno(child)
-            if child_end > -1:  # English
+            if child_end > -1:
                 end_lineno = max(end_lineno, child_end)
         return end_lineno
 
@@ -236,7 +228,7 @@ class FileHandler:
         with open(os.path.join(self.repo_path, file_path), "r", encoding="utf-8") as f:
             content = f.read()
             structures = self.get_functions_and_classes(content)
-            file_objects = []  # English
+            file_objects = []
             for struct in structures:
                 structure_type, name, start_line, end_line, params = struct
                 code_info = self.get_obj_code_info(
@@ -247,9 +239,6 @@ class FileHandler:
         return file_objects
 
     def generate_overall_structure(self, file_path_reflections, jump_files) -> dict:
-        """English，EnglishAST-walkEnglish。
-        Englishjump_files: Englishparse，English
-        """
         repo_structure = {}
         gitignore_checker = GitignoreChecker(
             directory=self.repo_path,
@@ -270,17 +259,14 @@ class FileHandler:
                 )
                 continue
             # elif not_ignored_files.endswith(latest_version):
-            #     """English，Englishfake_fileEnglish"""
             #     for k,v in file_path_reflections.items():
             #         if v == not_ignored_files and not os.path.exists(os.path.join(setting.project.target_repo, not_ignored_files)):
             #             print(f"{Fore.LIGHTYELLOW_EX}[Unstaged DeleteFile] load fake-file-content: {Style.RESET_ALL}{k}")
-            #             normal_file_names = k #English
             #             break
             #     if normal_file_names == not_ignored_files:
             #         continue
 
             # if not_ignored_files in file_path_reflections.keys():
-            #     not_ignored_files = file_path_reflections[not_ignored_files] #Englishfake_file_path
             #     print(f"{Fore.LIGHTYELLOW_EX}[Unstaged ChangeFile] load fake-file-content: {Style.RESET_ALL}{normal_file_names}")
 
             try:

@@ -34,6 +34,7 @@ class JsonFileProcessor:
                         md_contents.append(item["md_content"][0])
                         # Build a dictionary containing the required information
                         item_dict = {
+                            "file_path": file,
                             "type": item.get("type", "UnknownType"),
                             "name": item.get("name", "Unnamed"),
                             "code_start_line": item.get("code_start_line", -1),
@@ -73,7 +74,6 @@ class JsonFileProcessor:
                 code_results = []
                 md_results = []  # List to store matching items' code_content and md_content
                 self.recursive_search(data, search_text, code_results, md_results)
-                # English
                 if code_results or md_results:
                     return code_results, md_results
                 else:
