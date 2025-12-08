@@ -1,5 +1,3 @@
-from pathlib import Path
-
 class ContextGatherer:
     def __init__(self, setting):
         self.setting = setting
@@ -11,7 +9,7 @@ class ContextGatherer:
             "project_name": project_root.name,
             "entry_point_summary": "Entry point analysis pending.",
             "usage_context_from_tests": "Integration tests analysis pending.",
-            "tests_map": {}
+            "tests_map": {},
         }
 
         # 1. README
@@ -23,7 +21,9 @@ class ContextGatherer:
         for name in ["main.py", "app.py", "manage.py", "cli.py"]:
             p = project_root / name
             if p.exists():
-                context["entry_point_summary"] = f"Entry point ({name}):\n" + p.read_text(errors="ignore")[:2000]
+                context["entry_point_summary"] = (
+                    f"Entry point ({name}):\n" + p.read_text(errors="ignore")[:2000]
+                )
                 break
 
         # 3. Tests
@@ -35,15 +35,15 @@ class ContextGatherer:
             # Usage context from integration tests
             usage_context = []
             for t in integration_tests[:3]:
-                 usage_context.append(f"--- {t.name} ---\n{t.read_text(errors='ignore')[:2000]}")
+                usage_context.append(f"--- {t.name} ---\n{t.read_text(errors='ignore')[:2000]}")
 
             if usage_context:
                 context["usage_context_from_tests"] = "\n".join(usage_context)
             else:
-                 # Fallback to some unit tests if no integration tests
-                 for t in unit_tests[:3]:
-                     usage_context.append(f"--- {t.name} ---\n{t.read_text(errors='ignore')[:2000]}")
-                 context["usage_context_from_tests"] = "\n".join(usage_context)
+                # Fallback to some unit tests if no integration tests
+                for t in unit_tests[:3]:
+                    usage_context.append(f"--- {t.name} ---\n{t.read_text(errors='ignore')[:2000]}")
+                context["usage_context_from_tests"] = "\n".join(usage_context)
 
             # Map for specific file tests
             for t in integration_tests + unit_tests:

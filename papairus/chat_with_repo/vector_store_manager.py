@@ -699,11 +699,13 @@ class VectorStoreManager:
             doc_hash = hashlib.sha256((content + str(meta)).encode("utf-8")).hexdigest()
             # We use doc_hash as the document ID
             if doc_hash not in existing_ids:
-                 doc = Document(text=content, extra_info=meta)
-                 doc.id_ = doc_hash
-                 documents_to_process.append(doc)
+                doc = Document(text=content, extra_info=meta)
+                doc.id_ = doc_hash
+                documents_to_process.append(doc)
 
-        logger.info(f"Found {len(documents_to_process)} new documents to index out of {len(md_contents)}.")
+        logger.info(
+            f"Found {len(documents_to_process)} new documents to index out of {len(md_contents)}."
+        )
 
         # Initialize semantic chunker (SimpleNodeParser)
         logger.debug("Initializing semantic chunker (SimpleNodeParser).")
@@ -717,7 +719,9 @@ class VectorStoreManager:
         if documents_to_process:
             worker_count = self.max_workers or os.cpu_count() or 4
             worker_count = min(max(1, worker_count), len(documents_to_process))
-            logger.debug("Processing documents with ThreadPoolExecutor(max_workers=%s).", worker_count)
+            logger.debug(
+                "Processing documents with ThreadPoolExecutor(max_workers=%s).", worker_count
+            )
 
             results: dict[int, list] = {}
             with ThreadPoolExecutor(max_workers=worker_count) as executor:
@@ -778,9 +782,9 @@ class VectorStoreManager:
                         raise embed_exc
                     raise
         else:
-             index = VectorStoreIndex.from_vector_store(
-                 vector_store=vector_store, embed_model=self.embed_model
-             )
+            index = VectorStoreIndex.from_vector_store(
+                vector_store=vector_store, embed_model=self.embed_model
+            )
 
         retriever = VectorIndexRetriever(
             index=index, similarity_top_k=self.similarity_top_k, embed_model=self.embed_model
@@ -794,7 +798,9 @@ class VectorStoreManager:
             response_synthesizer=response_synthesizer,
         )
 
-        logger.info(f"Vector store created and loaded with {len(documents_to_process)} new documents.")
+        logger.info(
+            f"Vector store created and loaded with {len(documents_to_process)} new documents."
+        )
 
     def query_store(self, query):
         """

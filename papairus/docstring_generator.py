@@ -115,12 +115,12 @@ class DocstringGenerator:
             return False
 
         if self.backend == "ast":
-             for node, indent, existing_doc in candidates:
-                 doc_lines = self._build_ast_docstring(node, existing_doc, indent)
-                 if doc_lines:
-                     self._add_edit(node, existing_doc, doc_lines, edits)
+            for node, indent, existing_doc in candidates:
+                doc_lines = self._build_ast_docstring(node, existing_doc, indent)
+                if doc_lines:
+                    self._add_edit(node, existing_doc, doc_lines, edits)
         else:
-             self._process_batch(candidates, source_lines, edits)
+            self._process_batch(candidates, source_lines, edits)
 
         if not edits:
             return False
@@ -133,7 +133,7 @@ class DocstringGenerator:
     def _collect_candidates(self, node: ast.AST, candidates: List):
         for child in ast.iter_child_nodes(node):
             if isinstance(child, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)):
-                 self._check_candidate(child, candidates)
+                self._check_candidate(child, candidates)
             self._collect_candidates(child, candidates)
 
     def _check_candidate(self, node, candidates):
@@ -147,19 +147,21 @@ class DocstringGenerator:
         if self.force:
             needs_update = True
         elif self.backend == "ast":
-             # For AST, we allow all potentially valid nodes to be candidates
-             # _build_ast_docstring will check validity and completeness
-             needs_update = True
+            # For AST, we allow all potentially valid nodes to be candidates
+            # _build_ast_docstring will check validity and completeness
+            needs_update = True
         else:
-             refresh_existing = self.refresh_existing_llm_docstrings
-             if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
+            refresh_existing = self.refresh_existing_llm_docstrings
+            if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
                 parameters = self._extract_parameters(node)
                 return_info = self._extract_returns(node)
                 needs_return = return_info is not None
                 needs_update = refresh_existing or existing_docstring is None
                 if not needs_update:
-                    needs_update = self._docstring_incomplete(existing_docstring, parameters, needs_return)
-             elif isinstance(node, ast.ClassDef):
+                    needs_update = self._docstring_incomplete(
+                        existing_docstring, parameters, needs_return
+                    )
+            elif isinstance(node, ast.ClassDef):
                 needs_update = refresh_existing or existing_docstring is None
 
         if needs_update:
@@ -185,11 +187,11 @@ class DocstringGenerator:
 
             for (node, indent, existing_doc), docstring in zip(batch, results):
                 if docstring:
-                     # Normalize to remove wrapping quotes if present
-                     cleaned = self._normalize_llm_output(docstring)
-                     lines = self._indent_docstring(cleaned.splitlines(), indent)
-                     with edits_lock:
-                         self._add_edit(node, existing_doc, lines, edits)
+                    # Normalize to remove wrapping quotes if present
+                    cleaned = self._normalize_llm_output(docstring)
+                    lines = self._indent_docstring(cleaned.splitlines(), indent)
+                    with edits_lock:
+                        self._add_edit(node, existing_doc, lines, edits)
         except Exception:
             # Log error or silence it (DocstringGenerator shouldn't crash process easily)
             pass
@@ -205,7 +207,11 @@ class DocstringGenerator:
 
         with ThreadPoolExecutor() as executor:
             # Use map to process in parallel
-            list(executor.map(lambda b: self._process_batch_item(b, source_text, edits, edits_lock), batches))
+            list(
+                executor.map(
+                    lambda b: self._process_batch_item(b, source_text, edits, edits_lock), batches
+                )
+            )
 
     def _build_batch_prompt(self, batch, source_text):
         header = (
@@ -227,7 +233,9 @@ class DocstringGenerator:
     def _parse_batch_response(self, response, names):
         results = []
         for name in names:
-            pattern = re.compile(rf">>> {re.escape(name)}\s*(.*?)\s*<<< {re.escape(name)}", re.DOTALL)
+            pattern = re.compile(
+                rf">>> {re.escape(name)}\s*(.*?)\s*<<< {re.escape(name)}", re.DOTALL
+            )
             match = pattern.search(response)
             if match:
                 results.append(match.group(1).strip())
@@ -237,22 +245,22 @@ class DocstringGenerator:
 
     def _call_llm_raw(self, prompt: str) -> str:
         if self.llm_client is None:
-             raise ValueError("LLM backend requires an llm_client instance")
+            raise ValueError("LLM backend requires an llm_client instance")
 
         if isinstance(self.llm_client, LLMBackend):
-             messages = [ChatMessage(role="user", content=prompt)]
-             response = self.llm_client.generate_response(messages)
-             return str(response.message.content)
+            messages = [ChatMessage(role="user", content=prompt)]
+            response = self.llm_client.generate_response(messages)
+            return str(response.message.content)
 
         if callable(self.llm_client):
             return str(self.llm_client(prompt))
 
         chat_method = getattr(self.llm_client, "chat", None)
         if callable(chat_method):
-             messages = [ChatMessage(role="user", content=prompt)]
-             response = chat_method(messages)
-             message = getattr(response, "message", response)
-             return str(getattr(message, "content", ""))
+            messages = [ChatMessage(role="user", content=prompt)]
+            response = chat_method(messages)
+            message = getattr(response, "message", response)
+            return str(getattr(message, "content", ""))
 
         raise ValueError("llm_client must be callable or expose a chat(messages) method")
 

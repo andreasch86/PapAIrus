@@ -45,7 +45,9 @@ class ChatEngine:
             file_path=file_path,
             project_name=self.global_context.get("project_name", "Project"),
             entry_point_summary=entry_point,
-            usage_context_from_tests=self.global_context.get("usage_context_from_tests", "No usage context found."),
+            usage_context_from_tests=self.global_context.get(
+                "usage_context_from_tests", "No usage context found."
+            ),
             code_name=code_name,
             test_content=test_content,
             code_content=code_content,

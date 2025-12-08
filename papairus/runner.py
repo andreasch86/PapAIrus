@@ -36,7 +36,9 @@ class Runner:
 
         self.context_gatherer = ContextGatherer(self.setting)
         global_context = self.context_gatherer.gather()
-        self.chat_engine = ChatEngine(project_manager=self.project_manager, global_context=global_context)
+        self.chat_engine = ChatEngine(
+            project_manager=self.project_manager, global_context=global_context
+        )
 
         if not self.absolute_project_hierarchy_path.exists():
             file_path_reflections, jump_files = make_fake_files()
@@ -46,13 +48,13 @@ class Runner:
             # Load existing project hierarchy from checkpoint
             self.meta_info = MetaInfo.from_checkpoint_path(self.absolute_project_hierarchy_path)
 
-        self.meta_info.checkpoint(
-            target_dir_path=self.absolute_project_hierarchy_path
-        )
+        self.meta_info.checkpoint(target_dir_path=self.absolute_project_hierarchy_path)
         self.runner_lock = threading.Lock()
 
         self.markdown_generator = MarkdownGenerator(self.setting, self.meta_info, self.runner_lock)
-        self.documentation_updater = DocumentationUpdater(self.project_manager, self.chat_engine, self.setting)
+        self.documentation_updater = DocumentationUpdater(
+            self.project_manager, self.chat_engine, self.setting
+        )
 
     def generate_doc_for_a_single_item(self, doc_item: DocItem):
         """Generate documentation for a single item."""

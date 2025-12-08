@@ -1,8 +1,11 @@
 import shutil
 import time
 from pathlib import Path
+
 from tqdm import tqdm
+
 from papairus.log import logger
+
 
 class MarkdownGenerator:
     def __init__(self, setting, meta_info, lock):
@@ -28,6 +31,7 @@ class MarkdownGenerator:
         logger.debug(f"Found {len(file_item_list)} files to process.")
 
         for file_item in tqdm(file_item_list):
+
             def recursive_check(doc_item) -> bool:
                 if doc_item.md_content:
                     return True

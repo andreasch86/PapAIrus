@@ -1,9 +1,12 @@
 import json
 import os
 from concurrent.futures import ThreadPoolExecutor
+
 from colorama import Fore, Style
+
 from papairus.doc_meta_info import DocItem
 from papairus.log import logger
+
 
 class DocumentationUpdater:
     def __init__(self, project_manager, chat_engine, setting):
@@ -104,11 +107,7 @@ class DocumentationUpdater:
 
         # Process added changes
         for obj_name, _ in changes_in_pyfile["added"]:
-            for (
-                current_object
-            ) in (
-                current_objects.values()
-            ):
+            for current_object in current_objects.values():
                 if obj_name == current_object["name"]:
                     # Create referencer object
                     referencer_obj = {
