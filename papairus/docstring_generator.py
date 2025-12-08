@@ -103,7 +103,20 @@ class DocstringGenerator:
             return False
 
         edits: List[tuple[int, int, List[str], bool]] = []
-        self._collect_docstring_edits(tree, source_lines, edits)
+        candidates: List[tuple[ast.AST, str, Optional[str]]] = []
+
+        self._collect_candidates(tree, candidates)
+
+        if not candidates:
+            return False
+
+        if self.backend == "ast":
+             for node, indent, existing_doc in candidates:
+                 doc_lines = self._build_ast_docstring(node, existing_doc, indent)
+                 if doc_lines:
+                     self._add_edit(node, existing_doc, doc_lines, edits)
+        else:
+             self._process_batch(candidates, source_lines, edits)
 
         if not edits:
             return False
@@ -113,63 +126,120 @@ class DocstringGenerator:
             file_path.write_text("".join(new_source))
         return True
 
-    def _collect_docstring_edits(
-        self,
-        node: ast.AST,
-        source_lines: Sequence[str],
-        edits: List[tuple[int, int, List[str], bool]],
-    ) -> None:
-        """Recursively collect docstring edits for relevant nodes."""
-
+    def _collect_candidates(self, node: ast.AST, candidates: List):
         for child in ast.iter_child_nodes(node):
             if isinstance(child, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)):
-                self._maybe_add_docstring(child, source_lines, edits)
-            self._collect_docstring_edits(child, source_lines, edits)
+                 self._check_candidate(child, candidates)
+            self._collect_candidates(child, candidates)
 
-    def _maybe_add_docstring(
-        self,
-        node: ast.FunctionDef | ast.AsyncFunctionDef | ast.ClassDef,
-        source_lines: Sequence[str],
-        edits: List[tuple[int, int, List[str], bool]],
-    ) -> None:
-        existing_docstring = ast.get_docstring(node, clean=False)
-        has_docstring = existing_docstring is not None
-        body_indent = " " * (getattr(node, "col_offset", 0) + 4)
-
+    def _check_candidate(self, node, candidates):
         if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)) and node.name == "__init__":
             return
 
-        docstring_lines = self._build_docstring_if_needed(
-            node, existing_docstring, body_indent, source_lines
-        )
-        if docstring_lines is None:
-            return
+        existing_docstring = ast.get_docstring(node, clean=False)
+        body_indent = " " * (getattr(node, "col_offset", 0) + 4)
 
+        needs_update = False
+        if self.backend == "ast":
+             # For AST, we allow all potentially valid nodes to be candidates
+             # _build_ast_docstring will check validity and completeness
+             needs_update = True
+        else:
+             refresh_existing = self.refresh_existing_llm_docstrings
+             if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
+                parameters = self._extract_parameters(node)
+                return_info = self._extract_returns(node)
+                needs_return = return_info is not None
+                needs_update = refresh_existing or existing_docstring is None
+                if not needs_update:
+                    needs_update = self._docstring_incomplete(existing_docstring, parameters, needs_return)
+             elif isinstance(node, ast.ClassDef):
+                needs_update = refresh_existing or existing_docstring is None
+
+        if needs_update:
+            candidates.append((node, body_indent, existing_docstring))
+
+    def _add_edit(self, node, existing_docstring, docstring_lines, edits):
+        has_docstring = existing_docstring is not None
         if has_docstring:
             doc_expr = node.body[0]
             start = doc_expr.lineno - 1
-            end = doc_expr.end_lineno - 1  # type: ignore[attr-defined]
+            end = doc_expr.end_lineno - 1
             edits.append((start, end, docstring_lines, True))
         else:
-            first_body_line = node.body[0].lineno - 1 if node.body else node.lineno  # type: ignore[attr-defined]
+            first_body_line = node.body[0].lineno - 1 if node.body else node.lineno
             edits.append((first_body_line, first_body_line, docstring_lines, False))
 
-    def _build_docstring_if_needed(
-        self,
-        node: ast.FunctionDef | ast.AsyncFunctionDef | ast.ClassDef,
-        existing_docstring: Optional[str],
-        body_indent: str,
-        source_lines: Sequence[str],
-    ) -> Optional[List[str]]:
-        if self.backend == "ast":
-            return self._build_ast_docstring(node, existing_docstring, body_indent)
+    def _process_batch(self, candidates, source_lines, edits):
+        batch_size = 5
+        source_text = "".join(source_lines)
 
-        return self._build_llm_docstring(
-            node=node,
-            existing_docstring=existing_docstring,
-            body_indent=body_indent,
-            source_lines=source_lines,
+        for i in range(0, len(candidates), batch_size):
+            batch = candidates[i : i + batch_size]
+            prompt = self._build_batch_prompt(batch, source_text)
+
+            try:
+                response = self._call_llm_raw(prompt)
+                results = self._parse_batch_response(response, [c[0].name for c in batch])
+
+                for (node, indent, existing_doc), docstring in zip(batch, results):
+                    if docstring:
+                         # Normalize to remove wrapping quotes if present
+                         cleaned = self._normalize_llm_output(docstring)
+                         lines = self._indent_docstring(cleaned.splitlines(), indent)
+                         self._add_edit(node, existing_doc, lines, edits)
+            except Exception as e:
+                # Log error or silence it (DocstringGenerator shouldn't crash process easily)
+                pass
+
+    def _build_batch_prompt(self, batch, source_text):
+        header = (
+            "Generate Google-style Python docstrings for the following functions/classes. "
+            "Output each docstring inside a block delimited by >>> NAME and <<< NAME. "
+            "Example:\n"
+            ">>> my_function\n"
+            '"""\nDescription...\nArgs:\n...\n"""\n'
+            "<<< my_function\n\n"
+            "Code snippets:"
         )
+        snippets = []
+        for node, _, existing in batch:
+            seg = ast.get_source_segment(source_text, node) or ""
+            snippets.append(f"--- {node.name} ---\n{seg}\n")
+
+        return header + "\n\n" + "\n".join(snippets)
+
+    def _parse_batch_response(self, response, names):
+        results = []
+        for name in names:
+            pattern = re.compile(rf">>> {re.escape(name)}\s*(.*?)\s*<<< {re.escape(name)}", re.DOTALL)
+            match = pattern.search(response)
+            if match:
+                results.append(match.group(1).strip())
+            else:
+                results.append(None)
+        return results
+
+    def _call_llm_raw(self, prompt: str) -> str:
+        if self.llm_client is None:
+             raise ValueError("LLM backend requires an llm_client instance")
+
+        if isinstance(self.llm_client, LLMBackend):
+             messages = [ChatMessage(role="user", content=prompt)]
+             response = self.llm_client.generate_response(messages)
+             return str(response.message.content)
+
+        if callable(self.llm_client):
+            return str(self.llm_client(prompt))
+
+        chat_method = getattr(self.llm_client, "chat", None)
+        if callable(chat_method):
+             messages = [ChatMessage(role="user", content=prompt)]
+             response = chat_method(messages)
+             message = getattr(response, "message", response)
+             return str(getattr(message, "content", ""))
+
+        raise ValueError("llm_client must be callable or expose a chat(messages) method")
 
     def _build_ast_docstring(
         self, node: ast.AST, existing_docstring: Optional[str], body_indent: str
@@ -194,45 +264,6 @@ class DocstringGenerator:
 
         summary = self._existing_summary(existing_docstring) or self._summarize_name(node.name)
         return self._format_docstring(summary, parameters, return_info, body_indent)
-
-    def _build_llm_docstring(
-        self,
-        node: ast.FunctionDef | ast.AsyncFunctionDef | ast.ClassDef,
-        existing_docstring: Optional[str],
-        body_indent: str,
-        source_lines: Sequence[str],
-    ) -> Optional[List[str]]:
-        parameters: Sequence[ParameterDoc] = []
-        return_info: Optional[ReturnDoc] = None
-
-        refresh_existing = self.refresh_existing_llm_docstrings
-
-        if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
-            parameters = self._extract_parameters(node)
-            return_info = self._extract_returns(node)
-            needs_return = return_info is not None
-            needs_update = refresh_existing or existing_docstring is None
-            if not needs_update:
-                needs_update = self._docstring_incomplete(
-                    existing_docstring, parameters, needs_return
-                )
-        elif isinstance(node, ast.ClassDef):
-            needs_update = refresh_existing or existing_docstring is None
-        else:
-            return None
-
-        if not needs_update:
-            return None
-
-        prompt, snippet = self._build_llm_prompt_payload(node, source_lines, existing_docstring)
-        llm_output = self._call_llm(
-            code_snippet=snippet, prompt=prompt, existing_docstring=existing_docstring
-        )
-        if not llm_output:
-            return None
-
-        cleaned = self._normalize_llm_output(llm_output)
-        return self._indent_docstring(cleaned.splitlines(), body_indent)
 
     def _docstring_incomplete(
         self, docstring: str, parameters: Sequence[ParameterDoc], needs_return: bool
@@ -360,49 +391,6 @@ class DocstringGenerator:
             indented.append(f"{body_indent}{line.rstrip()}\n")
         indented.append(f'{body_indent}"""\n')
         return indented
-
-    def _build_llm_prompt_payload(
-        self, node: ast.AST, source_lines: Sequence[str], existing_docstring: Optional[str]
-    ) -> tuple[str, str]:
-        source_text = "".join(source_lines)
-        snippet = ast.get_source_segment(source_text, node) or ""
-        header = (
-            "Generate a concise Google-style Python docstring for the following "
-            "class or function. Include Args/Returns sections when appropriate."
-        )
-        if existing_docstring:
-            header += " Update the existing docstring to cover missing details."
-
-        prompt = "\n\n".join([header, "Code:", snippet])
-        return prompt, snippet
-
-    def _call_llm(
-        self, *, code_snippet: str, prompt: str, existing_docstring: Optional[str]
-    ) -> str:
-        if self.llm_client is None:
-            raise ValueError("LLM backend requires an llm_client instance")
-
-        if isinstance(self.llm_client, LLMBackend):
-            return self.llm_client.generate_docstring(
-                code_snippet=code_snippet,
-                style="google",
-                existing_docstring=existing_docstring,
-            )
-
-        if callable(self.llm_client):
-            return str(self.llm_client(prompt))
-
-        chat_method = getattr(self.llm_client, "chat", None)
-        if not callable(chat_method):
-            raise ValueError("llm_client must be callable or expose a chat(messages) method")
-
-        messages = [ChatMessage(role="user", content=prompt)]
-        response = chat_method(messages)
-        message = getattr(response, "message", response)
-        content = getattr(message, "content", None)
-        if content is None:
-            raise ValueError("LLM response did not include content")
-        return str(content)
 
     def _strip_delimiters(self, text: str) -> str:
         """Remove common Markdown/code fences, language hints, and string delimiters."""

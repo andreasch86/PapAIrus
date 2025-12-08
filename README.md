@@ -43,19 +43,19 @@ PapAIrus can auto-pull Ollama models when missing, but Ollama itself must be ins
   ollama serve
   ```
 
-By default, PapAIrus targets the `codegemma:instruct` model. If it is not present, the backend triggers `POST /api/pull` automatically before the first request. Auto-pull can be disabled via configuration if you prefer manual model management.
+By default, PapAIrus targets the `codegemma:7b-instruct-q4_K_M` model. If it is not present, the backend triggers `POST /api/pull` automatically before the first request. Auto-pull can be disabled via configuration if you prefer manual model management.
 
 ## Backend configuration
 PapAIrus exposes a unified interface for chat and docstring generation. Choose a backend per command:
 - `ast`: offline docstring extraction (no network calls)
 - `gemini`: Google Gemini models (requires `GEMINI_API_KEY`)
-- `gemma`: Local Gemma/CodeGemma via Ollama. The Ollama model tag is configured via `--ollama-model` (defaults to `codegemma:instruct`).
+- `gemma`: Local Gemma/CodeGemma via Ollama. The Ollama model tag is configured via `--ollama-model` (defaults to `codegemma:7b-instruct-q4_K_M`).
 
 Defaults:
-- Local model selector: `local-gemma` (uses Ollama `codegemma:instruct` by default)
+- Local model selector: `codegemma` (uses Ollama `codegemma:7b-instruct-q4_K_M` by default)
 - Ollama base URL: `http://localhost:11434`
-- Ollama model tag: `codegemma:instruct` (auto-pulled if missing)
-- Chat/documentation pipeline model selector: `local-gemma` chooses the Ollama-backed engine, while any `gemini-*` value targets Gemini.
+- Ollama model tag: `codegemma:7b-instruct-q4_K_M` (auto-pulled if missing)
+- Chat/documentation pipeline model selector: `codegemma` chooses the Ollama-backed engine, while any `gemini-*` value targets Gemini.
 
 Set the Gemini API key through `GEMINI_API_KEY` or `--gemini-api-key`. Ollama endpoints require no API key.
 
@@ -67,9 +67,9 @@ PapAIrus provides a CLI for generating docstrings and repository documentation p
 # AST-only generation (no network calls)
 papairus generate-docstrings --path path/to/project --dry-run
 
-# CodeGemma via Ollama (auto-pulls codegemma:instruct if missing)
+# CodeGemma via Ollama (auto-pulls codegemma:7b-instruct-q4_K_M if missing)
 papairus generate-docstrings --path path/to/project --backend gemma \
-  --ollama-base-url http://localhost:11434 --ollama-model codegemma:instruct
+  --ollama-base-url http://localhost:11434 --ollama-model codegemma:7b-instruct-q4_K_M
 
 # Gemini-backed generation (optional; requires an API key)
 export GEMINI_API_KEY=your_gemini_key
@@ -88,7 +88,7 @@ Run from the target repository root (or pass `--target-repo-path`):
 
 ```bash
 # Local CodeGemma via Ollama (default)
-papairus create-documentation --model local-gemma --base-url http://localhost:11434 --dry-run
+papairus create-documentation --model codegemma --base-url http://localhost:11434 --dry-run
 
 # Gemini cloud generation (optional)
 export GEMINI_API_KEY=your_gemini_key
@@ -108,7 +108,7 @@ After running `papairus create-documentation` at least once:
 # Launches a Gradio interface at http://localhost:7860/ by default
 papairus chat-with-repo
 ```
-`chat-with-repo` always uses the local CodeGemma instruct model served by Ollama (auto-pulled if missing). The chat pipeline injects repository context before sending prompts, so ensure the Ollama service is running and has network access to download `codegemma:instruct` on first launch.
+`chat-with-repo` always uses the local CodeGemma instruct model served by Ollama (auto-pulled if missing). The chat pipeline injects repository context before sending prompts, so ensure the Ollama service is running and has network access to download `codegemma:7b-instruct-q4_K_M` on first launch.
 
 ### Render GitBooks for the generated Markdown
 Use the `display/` helpers to build and serve a GitBook from the Markdown docs:

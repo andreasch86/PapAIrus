@@ -1,4 +1,5 @@
 import ast
+import types
 from pathlib import Path
 
 from papairus.docstring_generator import DocstringGenerator
@@ -61,10 +62,18 @@ def test_llm_backend_uses_client(tmp_path):
 
     class FakeLLM(LLMBackend):
         def generate_response(self, messages):
-            return None  # pragma: no cover - not used in this test
+            return types.SimpleNamespace(
+                message=types.SimpleNamespace(
+                    content=(
+                        ">>> shout\n"
+                        '"""Shout text.\n\nArgs:\n    text (str): Input.\nReturns:\n    str: Uppercase.\n"""\n'
+                        "<<< shout"
+                    )
+                )
+            )
 
-        def generate_docstring(self, code_snippet: str, *, style: str = "google", existing_docstring=None):
-            return """Shout text.\n\nArgs:\n    text (str): Input.\nReturns:\n    str: Uppercase.\n"""
+        def generate_docstring(self, *args, **kwargs):
+            raise RuntimeError("Should not be called")
 
     generator = DocstringGenerator(tmp_path, backend="gemini", llm_client=FakeLLM())
     updated = generator.run()
@@ -83,13 +92,20 @@ def test_llm_backend_uses_chat_messages(tmp_path):
         def __init__(self):
             self.messages = None
 
-        def generate_response(self, messages):  # pragma: no cover - docstring path only
+        def generate_response(self, messages):
             self.messages = messages
-            return None
+            return types.SimpleNamespace(
+                message=types.SimpleNamespace(
+                    content=(
+                        ">>> ping\n"
+                        '"""Ping value.\n\nArgs:\n    x (Any): Description of x.\nReturns:\n    Any: Description of return value.\n"""\n'
+                        "<<< ping"
+                    )
+                )
+            )
 
-        def generate_docstring(self, code_snippet: str, *, style: str = "google", existing_docstring=None):
-            self.messages = [ChatMessage(role="user", content=code_snippet)]
-            return '"""Ping value.\n\nArgs:\n    x (Any): Description of x.\nReturns:\n    Any: Description of return value.\n"""'
+        def generate_docstring(self, *args, **kwargs):
+            raise RuntimeError("Should not be called")
 
     llm = RecordingLLM()
     generator = DocstringGenerator(tmp_path, backend="gemma", llm_client=llm)
@@ -105,16 +121,22 @@ def test_llm_backend_strips_code_blocks_in_docstring(tmp_path):
     sample.write_text("class Sample:\n    pass\n")
 
     class CodeBlockLLM(LLMBackend):
-        def generate_response(self, messages):  # pragma: no cover - not used
-            return None
-
-        def generate_docstring(self, code_snippet: str, *, style: str = "google", existing_docstring=None):
-            return (
-                "```python\n"
-                "class Sample:\n"
-                '    """Sample docstring."""\n'
-                "```"
+        def generate_response(self, messages):
+            return types.SimpleNamespace(
+                message=types.SimpleNamespace(
+                    content=(
+                        ">>> Sample\n"
+                        "```python\n"
+                        "class Sample:\n"
+                        '    """Sample docstring."""\n'
+                        "```\n"
+                        "<<< Sample"
+                    )
+                )
             )
+
+        def generate_docstring(self, *args, **kwargs):
+            raise RuntimeError("Should not be called")
 
     generator = DocstringGenerator(tmp_path, backend="gemma", llm_client=CodeBlockLLM())
     updated = generator.run()
@@ -131,20 +153,24 @@ def test_llm_backend_strips_language_hints_and_recovers_docstring(tmp_path):
     sample.write_text("class LLMUsage:\n    pass\n")
 
     class LanguageHintLLM(LLMBackend):
-        def generate_response(self, messages):  # pragma: no cover - not used
-            return None
-
-        def generate_docstring(
-            self, code_snippet: str, *, style: str = "google", existing_docstring=None
-        ):
-            return (
-                "python\n"
-                "class LLMUsage:\n"
-                '    """A class to track usage."""\n'
-                "    def __init__(self, prompt_tokens: int, completion_tokens: int):\n"
-                "        self.prompt_tokens = prompt_tokens\n"
-                "        self.completion_tokens = completion_tokens\n"
+        def generate_response(self, messages):
+            return types.SimpleNamespace(
+                message=types.SimpleNamespace(
+                    content=(
+                        ">>> LLMUsage\n"
+                        "python\n"
+                        "class LLMUsage:\n"
+                        '    """A class to track usage."""\n'
+                        "    def __init__(self, prompt_tokens: int, completion_tokens: int):\n"
+                        "        self.prompt_tokens = prompt_tokens\n"
+                        "        self.completion_tokens = completion_tokens\n"
+                        "<<< LLMUsage"
+                    )
+                )
             )
+
+        def generate_docstring(self, *args, **kwargs):
+            raise RuntimeError("Should not be called")
 
     generator = DocstringGenerator(tmp_path, backend="gemma", llm_client=LanguageHintLLM())
     updated = generator.run()
@@ -161,18 +187,23 @@ def test_llm_backend_refreshes_existing_docstrings(tmp_path):
     sample.write_text('def div(a, b):\n    """Divide two values."""\n    return a / b\n')
 
     class RefreshingLLM(LLMBackend):
-        def generate_response(self, messages):  # pragma: no cover - not used
-            return None
-
-        def generate_docstring(
-            self, code_snippet: str, *, style: str = "google", existing_docstring=None
-        ):
-            return (
-                """Compute division while guarding zero values.\n\n"
-                "Args:\n    a (Any): Dividend.\n    b (Any): Divisor.\n"
-                "Returns:\n    Any: The division result.\n"
-                "Raises:\n    ZeroDivisionError: If b is zero.\n"""
+        def generate_response(self, messages):
+            return types.SimpleNamespace(
+                message=types.SimpleNamespace(
+                    content=(
+                        ">>> div\n"
+                        '"""Compute division while guarding zero values.\n\n'
+                        "Args:\n    a (Any): Dividend.\n    b (Any): Divisor.\n"
+                        "Returns:\n    Any: The division result.\n"
+                        "Raises:\n    ZeroDivisionError: If b is zero.\n"
+                        '"""\n'
+                        "<<< div"
+                    )
+                )
             )
+
+        def generate_docstring(self, *args, **kwargs):
+            raise RuntimeError("Should not be called")
 
     generator = DocstringGenerator(tmp_path, backend="gemma", llm_client=RefreshingLLM())
     updated = generator.run()
