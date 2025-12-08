@@ -46,7 +46,7 @@ PapAIrus exposes a unified interface for chat and docstring generation. Choose a
 - `gemma`: Local Gemma/CodeGemma via Ollama. The Ollama model tag is configured via `--ollama-model` (defaults to `codegemma:instruct`).
 
 Defaults:
-- Gemini model: `gemini-2.5-flash`
+- Local model selector: `local-gemma` (uses Ollama `codegemma:instruct` by default)
 - Ollama base URL: `http://localhost:11434`
 - Ollama model tag: `codegemma:instruct` (auto-pulled if missing)
 - Chat/documentation pipeline model selector: `local-gemma` chooses the Ollama-backed engine, while any `gemini-*` value targets Gemini.
@@ -61,14 +61,14 @@ PapAIrus provides a CLI for generating docstrings and repository documentation p
 # AST-only generation (no network calls)
 papairus generate-docstrings --path path/to/project --dry-run
 
-# Gemini-backed generation
-export GEMINI_API_KEY=your_gemini_key
-papairus generate-docstrings --path path/to/project --backend gemini \
-  --model gemini-2.5-flash --temperature 0.2
-
 # CodeGemma via Ollama (auto-pulls codegemma:instruct if missing)
 papairus generate-docstrings --path path/to/project --backend gemma \
   --ollama-base-url http://localhost:11434 --ollama-model codegemma:instruct
+
+# Gemini-backed generation (optional; requires an API key)
+export GEMINI_API_KEY=your_gemini_key
+papairus generate-docstrings --path path/to/project --backend gemini \
+  --model gemini-2.5-flash --temperature 0.2
 ```
 Key options:
 - `--backend`: choose `ast` (default), `gemini`, or `gemma`.
@@ -81,12 +81,12 @@ Key options:
 Run from the target repository root (or pass `--target-repo-path`):
 
 ```bash
-# Gemini cloud generation
+# Local CodeGemma via Ollama (default)
+papairus create-documentation --model local-gemma --base-url http://localhost:11434 --dry-run
+
+# Gemini cloud generation (optional)
 export GEMINI_API_KEY=your_gemini_key
 papairus create-documentation --model gemini-2.5-flash --allow-main --telemetry
-
-# Local CodeGemma via Ollama
-papairus create-documentation --model local-gemma --base-url http://localhost:11434 --dry-run
 ```
 Key flags:
 - `--allow-main`: acknowledge running on protected branches.

@@ -78,7 +78,7 @@ def _suggest_docs_refresh(repo: git.Repo, docs_path: Path, docs_folder_name: str
 @click.option(
     "--model",
     "-m",
-    default="gemini-2.5-flash",
+    default="local-gemma",
     show_default=True,
     help="Specifies the model to use for completion (local-gemma or any Gemini model starting with 'gemini-').",
     type=str,

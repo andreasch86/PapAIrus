@@ -76,7 +76,7 @@ def test_settings_manager_initialization(temp_repo):
     # Uses fixture to preconfigure settings
     setting = SettingsManager.get_setting()
     assert setting.project.target_repo.exists()
-    assert setting.chat_completion.model == "gemini-2.5-flash"
+    assert setting.chat_completion.model == "local-gemma"
 
 
 def test_settings_manager_initialize_with_params_sets_instance(tmp_path):
@@ -90,7 +90,7 @@ def test_settings_manager_initialize_with_params_sets_instance(tmp_path):
         language="English",
         max_thread_count=2,
         log_level="INFO",
-        model="gemini-2.5-flash",
+        model="local-gemma",
         temperature=0.3,
         request_timeout=30,
         gemini_base_url="https://example.com",

@@ -53,7 +53,7 @@ class ProjectSettings(BaseSettings):
 
 class ChatCompletionSettings(BaseSettings):
     engine: Optional[str] = None
-    model: str = "gemini-2.5-flash"  # Gemini (API key) or local Gemma are allowed.
+    model: str = "local-gemma"  # Local Gemma (via Ollama) by default; Gemini allowed explicitly.
     temperature: PositiveFloat = 0.2
     request_timeout: PositiveInt = 60
     gemini_base_url: str = "https://aiplatform.googleapis.com/v1"
