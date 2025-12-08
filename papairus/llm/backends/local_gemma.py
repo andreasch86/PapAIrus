@@ -54,10 +54,12 @@ class LocalGemmaBackend(LLMBackend):
 
     def generate_response(self, messages: Sequence[ChatMessage]) -> LLMResponse:
         self._ensure_model()
+        normalized_messages = list(self._normalize_messages(messages))
         payload = {
             "model": self.model,
             "messages": [
-                {"role": message.role, "content": message.content} for message in messages
+                {"role": message.role, "content": str(message.content)}
+                for message in normalized_messages
             ],
             "options": {"temperature": self.temperature},
             "stream": False,
