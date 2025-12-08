@@ -20,6 +20,7 @@ class GeminiBackend(LLMBackend):
         temperature: float,
         timeout: int,
     ) -> None:
+        super().__init__()
         self.api_key = api_key
         self.model = model
         self.temperature = temperature

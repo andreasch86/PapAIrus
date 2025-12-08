@@ -21,6 +21,7 @@ class LocalGemmaBackend(LLMBackend):
         request_timeout: int = 60,
         auto_pull: bool = True,
     ) -> None:
+        super().__init__()
         self.model = model
         self.base_url = base_url.rstrip("/")
         self.temperature = temperature

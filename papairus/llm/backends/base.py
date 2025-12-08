@@ -53,6 +53,9 @@ class LLMResponse:
 class LLMBackend(ABC):
     """Abstract base for all LLM backends."""
 
+    def __init__(self) -> None:
+        self._system_prompt: str = ""
+
     @property
     def metadata(self) -> LLMMetadata:
         """Return llama-index compatible metadata for the backend."""
@@ -69,6 +72,17 @@ class LLMBackend(ABC):
 
         model_name = getattr(self, "model", "unknown")
         return LLMMetadata(model_name=model_name, type=self.__class__.__name__.lower())
+
+    @property
+    def system_prompt(self) -> str:
+        """System prompt hint for llama-index prompt helpers."""
+
+        return getattr(self, "_system_prompt", "")
+
+    def update_system_prompt(self, prompt: str) -> None:
+        """Persist a system prompt for downstream prompt helpers."""
+
+        self._system_prompt = prompt
 
     @abstractmethod
     def generate_response(self, messages: Sequence[ChatMessage]) -> LLMResponse:

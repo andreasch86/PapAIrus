@@ -148,6 +148,74 @@ def _validate_embedding_vector(embedding, base_url: str | None, model_name: str 
     return cleaned
 
 
+def _build_repo_system_prompt(meta_data: list[dict]) -> str:
+    """Construct a concise system prompt capturing repository context."""
+
+    normalized_meta: list[dict] = []
+    for entry in meta_data:
+        if isinstance(entry, dict):
+            normalized_meta.append(entry)
+        else:
+            normalized_meta.append({"source": str(entry), "type": "UnknownType"})
+
+    total_items = len(normalized_meta)
+    types = {str(entry.get("type", "UnknownType")) for entry in normalized_meta}
+    sample_lines: list[str] = []
+
+    for entry in normalized_meta[:5]:
+        name = (
+            entry.get("name")
+            or entry.get("source")
+            or entry.get("path")
+            or entry.get("type")
+            or "item"
+        )
+        entry_type = entry.get("type") or "UnknownType"
+        location = entry.get("source") or entry.get("path")
+        descriptor = f"- {name} ({entry_type})"
+        if location:
+            descriptor += f" from {location}"
+        sample_lines.append(descriptor)
+
+    header = (
+        "You are an AI assistant answering questions about this repository. Use only the "
+        "retrieved context chunks from the vector store when forming answers. If the "
+        "context is insufficient, say you do not know rather than guessing."
+    )
+
+    summary = (
+        f"Indexed repository summary: {total_items} items. "
+        f"Item types include: {', '.join(sorted(types)) if types else 'unknown'}."
+    )
+
+    examples = "\n".join(sample_lines)
+    if examples:
+        examples = "Examples of indexed items:\n" + examples
+
+    return "\n\n".join(part for part in [header, summary, examples] if part)
+
+
+def _apply_system_prompt(llm, prompt: str) -> None:
+    """Attach a system prompt to the LLM if the interface supports it."""
+
+    if hasattr(llm, "update_system_prompt"):
+        try:
+            llm.update_system_prompt(prompt)
+            return
+        except Exception:
+            pass
+
+    if hasattr(llm, "system_prompt"):
+        try:
+            setattr(llm, "system_prompt", prompt)
+            return
+        except Exception:
+            pass
+
+    if hasattr(llm, "__dict__"):
+        llm.__dict__["system_prompt"] = prompt
+
+
 class _ChunkingEmbeddingWrapper(BaseEmbedding):
     """A light wrapper that chunks embedding batches to reduce request load."""
 
@@ -609,6 +677,9 @@ class VectorStoreManager:
 
         logger.debug(f"Number of markdown contents: {len(md_contents)}")
         logger.debug(f"Number of metadata entries: {len(meta_data)}")
+
+        repo_system_prompt = _build_repo_system_prompt(meta_data)
+        _apply_system_prompt(self.llm, repo_system_prompt)
 
         # Fail fast if the Ollama embedding model is unavailable, instead of
         # streaming a series of semantic-splitter fallbacks before the eventual

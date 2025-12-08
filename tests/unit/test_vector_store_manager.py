@@ -90,6 +90,14 @@ class DummyQueryEngine:
         return types.SimpleNamespace(response="ok", metadata={})
 
 
+class RecordingLLM:
+    def __init__(self):
+        self.prompts: list[str] = []
+
+    def update_system_prompt(self, prompt: str) -> None:
+        self.prompts.append(prompt)
+
+
 class DummyEmbedModel:
     def __init__(self, *, model_name="dummy-embed", base_url="http://localhost:11434"):
         self.model_name = model_name
@@ -237,6 +245,20 @@ def test_create_vector_store_filters_empty_chunks(monkeypatch, patched_manager):
 
     assert patched_manager.query_engine is not None
     assert patched_manager.query_engine.retriever.index.nodes == ["node-keep"]
+
+
+def test_system_prompt_applied_from_metadata(patched_manager):
+    patched_manager.llm = RecordingLLM()
+
+    md_contents = ["hello world"]
+    meta_data = [{"source": "src/app.py", "type": "Function", "name": "foo"}]
+
+    patched_manager.create_vector_store(md_contents, meta_data)
+
+    assert patched_manager.llm.prompts
+    prompt = patched_manager.llm.prompts[-1]
+    assert "src/app.py" in prompt
+    assert "Function" in prompt
 
 
 def test_create_vector_store_uses_thread_pool(monkeypatch, patched_manager):
