@@ -291,7 +291,7 @@ def diff():
         return
 
     runner = Runner()
-    if runner.meta_info.in_generation_process:  # English，English
+    if runner.meta_info.in_generation_process:  # Process already running
         click.echo("This command only supports pre-check")
         raise click.Abort()
 
@@ -410,6 +410,12 @@ def chat_with_repo():
     show_default=True,
     help="Ollama model name when using the Gemma backend.",
 )
+@click.option(
+    "--force",
+    is_flag=True,
+    default=False,
+    help="Force update of all docstrings.",
+)
 def generate_docstrings(
     path: Path,
     dry_run: bool,
@@ -421,6 +427,7 @@ def generate_docstrings(
     gemini_api_key: str | None,
     ollama_base_url: str,
     ollama_model: str,
+    force: bool,
 ):
     """Add Google-style docstrings to callables missing complete documentation."""
 
@@ -450,7 +457,7 @@ def generate_docstrings(
         except Exception as exc:  # pragma: no cover - defensive guard for CLI output
             raise click.ClickException(str(exc))
 
-    generator = DocstringGenerator(path, backend=backend, llm_client=llm_client)
+    generator = DocstringGenerator(path, backend=backend, llm_client=llm_client, force=force)
 
     def _progress(path: Path, status: str) -> None:
         if status == "start":

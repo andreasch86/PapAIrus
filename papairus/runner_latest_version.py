@@ -231,7 +231,8 @@ class Runner:
 
     def process_file_changes(self, repo_path, file_path, is_new_file):
         """
-        This function is called in the loop of detected changed files. Its purpose is to process changed files according to the absolute file path, including new files and existing files.
+        Process file changes according to the absolute file path, including new files and existing files.
+
         Among them, changes_in_pyfile is a dictionary that contains information about the changed structures. An example format is: {'added': {'add_context_stack', '__init__'}, 'removed': set()}
 
         Args:

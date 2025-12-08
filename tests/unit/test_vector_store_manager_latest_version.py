@@ -374,10 +374,32 @@ def test_get_node_content_falls_back_to_text():
     node = OversizedNode("node-text")
 
     class TextOnly:
+        """
+        A class that represents text-only content.
+        
+        Attributes:
+            text: The text content.
+        """
         text = "text-only"
 
     class Raises:
+        """
+        A class that raises an error when getting content.
+        
+        Methods:
+            get_content(self, metadata_mode=None): Raises a RuntimeError.
+        """
         def get_content(self, metadata_mode=None):
+            """
+            A method that raises an error when getting content.
+            
+            Args:
+                self: The instance of the class.
+                metadata_mode: The metadata mode.
+            
+            Raises:
+                RuntimeError: An error occurred.
+            """
             raise RuntimeError("boom")
 
     assert _get_node_content(node) == "node-text"
@@ -386,12 +408,25 @@ def test_get_node_content_falls_back_to_text():
 
 
 def test_create_vector_store_skips_when_missing_data(patched_manager):
+    """
+    A test that verifies that the vector store is not created when missing data.
+    
+    Args:
+        patched_manager: A patched vector store manager.
+    """
     patched_manager.create_vector_store([], [])
 
     assert patched_manager.query_engine is None
 
 
 def test_create_vector_store_handles_empty_nodes(monkeypatch, patched_manager):
+    """
+    A test that verifies that the vector store is not created when empty nodes are provided.
+    
+    Args:
+        monkeypatch: A pytest monkeypatch.
+        patched_manager: A patched vector store manager.
+    """
     class EmptySplitter:
         def __init__(self, *args, **kwargs):
             self.chunk_size = kwargs.get("chunk_size")
@@ -1251,11 +1286,50 @@ def test_embed_via_http_rejects_non_numeric_embedding(monkeypatch):
         model_name = "nomic-embed-text"
 
     def fake_post(url, json, timeout):
+        """
+        Generates a fake response object for testing purposes.
+        
+        Args:
+            url: The URL to send the request to.
+            json: The JSON data to send with the request.
+            timeout: The timeout for the request.
+        
+        Returns:
+            A Response object with a mocked response.
+        """
         class Response:
+            """
+            A class representing a response object.
+            
+            Attributes:
+                None
+            
+            Methods:
+                raise_for_status(): Raises an exception if the response status code is not 200.
+                json(): Returns the response data as a dictionary.
+            """
             def raise_for_status(self):
+                """
+                Raises an exception if the response status code is not 200.
+                
+                Args:
+                    self: The Response object.
+                
+                Returns:
+                    None
+                """
                 return None
 
             def json(self):
+                """
+                Returns the response data as a dictionary.
+                
+                Args:
+                    self: The Response object.
+                
+                Returns:
+                    A dictionary containing the response data.
+                """
                 return {"embedding": [1, "bad"]}
 
         return Response()
@@ -1271,6 +1345,15 @@ def test_embed_via_http_rejects_non_numeric_embedding(monkeypatch):
 
 
 def test_chunking_wrapper_get_text_embedding_missing_method():
+    """
+    Tests that the `_wrap_chunking_embed_model()` function raises an exception if the wrapped object does not have a `get_text_embedding()` method.
+    
+    Args:
+        None
+    
+    Returns:
+        None
+    """
     from papairus.chat_with_repo.vector_store_manager import (
         _wrap_chunking_embed_model,
     )
@@ -1302,14 +1385,35 @@ def test_chunking_wrapper_rejects_empty_batch_embedding():
 
 
 def test_chunking_wrapper_rejects_mismatched_batch_length():
+    """
+    Test that the chunking wrapper rejects batches with mismatched lengths.
+    
+    This test simulates a service bug where the embedding service returns fewer embeddings than requested. The chunking wrapper should raise an `EmbeddingServiceError` in this case.
+    """
     from papairus.chat_with_repo.vector_store_manager import _ChunkingEmbeddingWrapper
 
     class BatchOnly:
+        """
+        A class that provides text embedding functionality.
+        
+        This class simulates an external service that only provides embeddings for batches of text.
+        """
         base_url = "http://localhost:11434"
         model_name = "nomic-embed-text"
 
         def get_text_embedding_batch(self, texts):
             # Return fewer embeddings than requested to simulate a service bug.
+            """
+            Get text embeddings for a batch of texts.
+            
+            This method simulates a service bug where the embedding service returns fewer embeddings than requested. The chunking wrapper should raise an `EmbeddingServiceError` in this case.
+            
+            Args:
+                texts: A list of texts to embed.
+            
+            Returns:
+                A list of text embeddings.
+            """
             return [[1.0]]
 
     wrapped = _ChunkingEmbeddingWrapper(BatchOnly(), max_batch_size=2)
@@ -1320,9 +1424,19 @@ def test_chunking_wrapper_rejects_mismatched_batch_length():
 
 
 def test_chunking_wrapper_ignores_show_progress_kwarg():
+    """
+    Test that the chunking wrapper ignores the `show_progress` kwarg.
+    
+    This test ensures that the chunking wrapper does not raise an error if the `show_progress` kwarg is set to `False`.
+    """
     from papairus.chat_with_repo.vector_store_manager import _ChunkingEmbeddingWrapper
 
     class BatchOnly:
+        """
+        A class that provides text embedding functionality.
+        
+        This class simulates an external service that only provides embeddings for batches of text.
+        """
         model_name = "nomic-embed-text"
 
         def get_text_embedding_batch(self, texts):

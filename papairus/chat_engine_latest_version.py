@@ -18,7 +18,15 @@ class ChatEngine:
         self.global_context = global_context or {}
 
     def build_prompt(self, doc_item: DocItem):
-        """Builds and returns the system and user prompts based on the DocItem."""
+        """
+        Builds and returns the system and user prompts based on the DocItem.
+
+        Args:
+        doc_item: The DocItem object containing the code information.
+
+        Returns:
+        A list of messages containing the system and user prompts.
+        """
         setting = SettingsManager.get_setting()
 
         code_info = doc_item.content
@@ -55,7 +63,15 @@ class ChatEngine:
         )
 
     def generate_doc(self, doc_item: DocItem):
-        """Generates documentation for a given DocItem."""
+        """
+        Generates documentation for a given DocItem.
+
+        Args:
+        doc_item: The DocItem object containing the code information.
+
+        Returns:
+        The generated documentation string.
+        """
         messages = self.build_prompt(doc_item)
 
         try:

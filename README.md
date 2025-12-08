@@ -12,15 +12,13 @@ PapAIrus (`papairus`) is a documentation-focused fork of [OpenBMB/RepoAgent](htt
 ## Prerequisites
 - Python 3.11
 - [uv](https://docs.astral.sh/uv/) for dependency management
-- Optional: [Ollama](https://ollama.com) for local Gemma/CodeGemma models
+- [Ollama](https://ollama.com) for local Gemma/CodeGemma models
+- Gemini API Key
 
 ## Installation
 ```bash
-git clone https://github.com/andreasch86/PapAIrus.git
-cd PapAIrus
-uv venv --python 3.11
-source .venv/bin/activate
-uv pip install -e .[chat_with_repo]
+git clone ...
+uv pip install -e .
 ```
 
 ### Installing Ollama
@@ -47,7 +45,7 @@ By default, PapAIrus targets the `codegemma:7b-instruct-q4_K_M` model. If it is 
 
 ## Backend configuration
 PapAIrus exposes a unified interface for chat and docstring generation. Choose a backend per command:
-- `ast`: offline docstring extraction (no network calls)
+- `ast`: offline docstring extraction (ONLY for Docstrings; no network necessary)
 - `gemini`: Google Gemini models (requires `GEMINI_API_KEY`)
 - `gemma`: Local Gemma/CodeGemma via Ollama. The Ollama model tag is configured via `--ollama-model` (defaults to `codegemma:7b-instruct-q4_K_M`).
 
@@ -68,7 +66,7 @@ PapAIrus provides a CLI for generating docstrings and repository documentation p
 papairus generate-docstrings --path path/to/project --dry-run
 
 # CodeGemma via Ollama (auto-pulls codegemma:7b-instruct-q4_K_M if missing)
-papairus generate-docstrings --path path/to/project --backend gemma \
+papairus generate-docstrings --backend gemma \
   --ollama-base-url http://localhost:11434 --ollama-model codegemma:7b-instruct-q4_K_M
 
 # Gemini-backed generation (optional; requires an API key)
@@ -77,6 +75,7 @@ papairus generate-docstrings --path path/to/project --backend gemini \
   --model gemini-2.5-flash --temperature 0.2
 ```
 Key options:
+- `--path`: relative or absolute path, defaults to the current working directory.
 - `--backend`: choose `ast` (default), `gemini`, or `gemma`.
 - `--dry-run`: show which files would change without writing them.
 - `--model`: override the default model per backend.
@@ -84,6 +83,8 @@ Key options:
 - `--ollama-base-url`/`--ollama-model`: control the Gemma/CodeGemma Ollama endpoint and model. Auto-pull is enabled by default and can be disabled via configuration if needed.
 
 ### Generate repository documentation (CLI)
+<span style="color: red">**NOTE: It is recommended to run `generate-docstrings` before running this command**</span>
+
 Run from the target repository root (or pass `--target-repo-path`):
 
 ```bash
@@ -102,7 +103,7 @@ Key flags:
 - `--markdown-docs-path` and `--hierarchy-path` control where generated Markdown files and hierarchy metadata are written (default `docs` and `.project_doc_record`).
 
 ### Interactive chat over generated docs
-After running `papairus create-documentation` at least once:
+<span style="color: red">**After running `papairus create-documentation` at least once:**</span>
 
 ```bash
 # Launches a Gradio interface at http://localhost:7860/ by default

@@ -4,6 +4,14 @@ import jedi
 
 
 class ProjectManager:
+    """
+    A class that manages a project.
+
+    Args:
+        repo_path: The path to the project repository.
+        project_hierarchy: The name of the project hierarchy file.
+    """
+
     def __init__(self, repo_path, project_hierarchy):
         self.repo_path = repo_path
         self.project = jedi.Project(self.repo_path)
@@ -20,6 +28,16 @@ class ProjectManager:
         """
 
         def walk_dir(root, prefix=""):
+            """
+            Walks through the directory tree and returns a list of files and directories.
+
+            Args:
+                root: The root directory to walk through.
+                prefix: The prefix to add to each file and directory name.
+
+            Returns:
+                list: A list of files and directories.
+            """
             structure.append(prefix + os.path.basename(root))
             new_prefix = prefix + "  "
             for name in sorted(os.listdir(root)):
@@ -36,9 +54,26 @@ class ProjectManager:
         return "\n".join(structure)
 
     def build_path_tree(self, who_reference_me, reference_who, doc_item_path):
+        """
+        Builds a path tree from a list of paths.
+
+        Args:
+            who_reference_me: A list of paths that reference the document item.
+            reference_who: A list of paths that are referenced by the document item.
+            doc_item_path: The path to the document item.
+
+        Returns:
+            str: A string representation of the path tree.
+        """
         from collections import defaultdict
 
         def tree():
+            """
+            Returns a new defaultdict instance.
+
+            Returns:
+                defaultdict: A new defaultdict instance.
+            """
             return defaultdict(tree)
 
         path_tree = tree()

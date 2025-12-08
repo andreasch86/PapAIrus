@@ -267,6 +267,18 @@ class DocstringGenerator:
     def _build_ast_docstring(
         self, node: ast.AST, existing_docstring: Optional[str], body_indent: str
     ) -> Optional[List[str]]:
+        """
+        Generates a Google-style Python docstring for a given AST node.
+
+        Args:
+            self: The `DocstringGenerator` instance.
+            node: The AST node to generate a docstring for.
+            existing_docstring: The existing docstring for the node.
+            body_indent: The indentation of the body of the docstring.
+
+        Returns:
+            A list of lines for the docstring, or `None` if no docstring should be generated.
+        """
         if isinstance(node, ast.ClassDef):
             if existing_docstring:
                 return None
@@ -291,22 +303,63 @@ class DocstringGenerator:
     def _docstring_incomplete(
         self, docstring: str, parameters: Sequence[ParameterDoc], needs_return: bool
     ) -> bool:
+        """
+        Checks if a docstring is incomplete.
+
+        Args:
+            self: The `DocstringGenerator` instance.
+            docstring: The docstring to check.
+            parameters: The parameters of the function or method.
+            needs_return: Whether the function or method returns a value.
+
+        Returns:
+            True if the docstring is incomplete, False otherwise.
+        """
         doc_lower = docstring.lower()
         missing_params = [param for param in parameters if param.name.lower() not in doc_lower]
         missing_return = needs_return and "returns:" not in doc_lower
         return bool(missing_params or missing_return)
 
     def _existing_summary(self, docstring: Optional[str]) -> Optional[str]:
+        """
+        Extracts the summary from an existing docstring.
+
+        Args:
+            self: The `DocstringGenerator` instance.
+            docstring: The existing docstring.
+
+        Returns:
+            The summary of the docstring, or `None` if no summary is found.
+        """
         if not docstring:
             return None
         stripped = docstring.strip().splitlines()
         return stripped[0].strip() if stripped else None
 
     def _extract_parameters(self, node: ast.AST) -> List[ParameterDoc]:
+        """
+        Extracts the parameters from an AST node.
+
+        Args:
+            self: The `DocstringGenerator` instance.
+            node: The AST node to extract parameters from.
+
+        Returns:
+            A list of `ParameterDoc` objects representing the parameters of the node.
+        """
         assert isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef))
         params: List[ParameterDoc] = []
 
         def annotation_to_str(annotation: Optional[ast.AST]) -> str:
+            """
+            Converts an AST annotation to a string.
+
+            Args:
+                annotation: The AST annotation to convert.
+
+            Returns:
+                A string representation of the annotation, or "Any" if the annotation is None.
+            """
             if annotation is None:
                 return "Any"
             try:
