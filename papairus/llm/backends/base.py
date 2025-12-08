@@ -28,9 +28,10 @@ class LLMMetadata:
     """Lightweight metadata container matching llama-index expectations."""
 
     model_name: str
-    context_window: int | None = None
-    num_output: int | None = None
+    context_window: int = 8192
+    num_output: int = 1024
     type: str = "custom"
+    is_chat_model: bool = True
 
 
 @dataclass
@@ -52,15 +53,36 @@ class LLMResponse:
 class LLMBackend(ABC):
     """Abstract base for all LLM backends."""
 
+    def __init__(self) -> None:
+        self._system_prompt: str = ""
+
     @property
     def metadata(self) -> LLMMetadata:
         """Return llama-index compatible metadata for the backend."""
 
         if hasattr(self, "_metadata"):
-            return self._metadata  # type: ignore[attr-defined]
+            meta: LLMMetadata = getattr(self, "_metadata")  # type: ignore[attr-defined]
+            if meta.context_window is None:
+                meta.context_window = LLMMetadata.context_window
+            if meta.num_output is None:
+                meta.num_output = LLMMetadata.num_output
+            if meta.is_chat_model is None:
+                meta.is_chat_model = True
+            return meta
 
         model_name = getattr(self, "model", "unknown")
         return LLMMetadata(model_name=model_name, type=self.__class__.__name__.lower())
+
+    @property
+    def system_prompt(self) -> str:
+        """System prompt hint for llama-index prompt helpers."""
+
+        return getattr(self, "_system_prompt", "")
+
+    def update_system_prompt(self, prompt: str) -> None:
+        """Persist a system prompt for downstream prompt helpers."""
+
+        self._system_prompt = prompt
 
     @abstractmethod
     def generate_response(self, messages: Sequence[ChatMessage]) -> LLMResponse:
@@ -83,8 +105,17 @@ class LLMBackend(ABC):
         return self.generate_response(normalized)
 
     def complete(self, prompt: str, **_: object):
-        response = self.generate_response([ChatMessage(role="user", content=prompt)])
-        return SimpleNamespace(text=response.message.content)
+        return SimpleNamespace(text=self.predict(prompt))
+
+    def predict(self, prompt: str, **_: object) -> str:
+        """Compatibility shim for llama-index completion calls."""
+
+        messages: list[ChatMessage] = []
+        if self.system_prompt:
+            messages.append(ChatMessage(role="system", content=self.system_prompt))
+        messages.append(ChatMessage(role="user", content=prompt))
+        response = self.generate_response(messages)
+        return response.message.content
 
     def _normalize_messages(
         self, messages: Sequence[ChatMessage | SimpleNamespace | dict | str]

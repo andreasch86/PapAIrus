@@ -1,3 +1,6 @@
+import os
+from concurrent.futures import ThreadPoolExecutor, as_completed
+
 import chromadb
 import requests
 from llama_index.core import Document, StorageContext, VectorStoreIndex, get_response_synthesizer
@@ -143,6 +146,74 @@ def _validate_embedding_vector(embedding, base_url: str | None, model_name: str 
         cleaned.append(float(value))
 
     return cleaned
+
+
+def _build_repo_system_prompt(meta_data: list[dict]) -> str:
+    """Construct a concise system prompt capturing repository context."""
+
+    normalized_meta: list[dict] = []
+    for entry in meta_data:
+        if isinstance(entry, dict):
+            normalized_meta.append(entry)
+        else:
+            normalized_meta.append({"source": str(entry), "type": "UnknownType"})
+
+    total_items = len(normalized_meta)
+    types = {str(entry.get("type", "UnknownType")) for entry in normalized_meta}
+    sample_lines: list[str] = []
+
+    for entry in normalized_meta[:5]:
+        name = (
+            entry.get("name")
+            or entry.get("source")
+            or entry.get("path")
+            or entry.get("type")
+            or "item"
+        )
+        entry_type = entry.get("type") or "UnknownType"
+        location = entry.get("source") or entry.get("path")
+        descriptor = f"- {name} ({entry_type})"
+        if location:
+            descriptor += f" from {location}"
+        sample_lines.append(descriptor)
+
+    header = (
+        "You are an AI assistant answering questions about this repository. Use only the "
+        "retrieved context chunks from the vector store when forming answers. If the "
+        "context is insufficient, say you do not know rather than guessing."
+    )
+
+    summary = (
+        f"Indexed repository summary: {total_items} items. "
+        f"Item types include: {', '.join(sorted(types)) if types else 'unknown'}."
+    )
+
+    examples = "\n".join(sample_lines)
+    if examples:
+        examples = "Examples of indexed items:\n" + examples
+
+    return "\n\n".join(part for part in [header, summary, examples] if part)
+
+
+def _apply_system_prompt(llm, prompt: str) -> None:
+    """Attach a system prompt to the LLM if the interface supports it."""
+
+    if hasattr(llm, "update_system_prompt"):
+        try:
+            llm.update_system_prompt(prompt)
+            return
+        except Exception:
+            pass
+
+    if hasattr(llm, "system_prompt"):
+        try:
+            setattr(llm, "system_prompt", prompt)
+            return
+        except Exception:
+            pass
+
+    if hasattr(llm, "__dict__"):
+        llm.__dict__["system_prompt"] = prompt
 
 
 class _ChunkingEmbeddingWrapper(BaseEmbedding):
@@ -525,7 +596,14 @@ def _rechunk_oversized_nodes(nodes, max_chars: int = _MAX_EMBED_CHARS):
 
 
 class VectorStoreManager:
-    def __init__(self, top_k, llm, embed_model, embed_batch_size: int | None = None):
+    def __init__(
+        self,
+        top_k,
+        llm,
+        embed_model,
+        embed_batch_size: int | None = None,
+        max_workers: int | None = None,
+    ):
         """
         Initialize the VectorStoreManager.
         """
@@ -536,6 +614,7 @@ class VectorStoreManager:
         self.llm = llm
         self._base_embed_model = embed_model
         self.embed_model = _wrap_chunking_embed_model(embed_model, embed_batch_size)
+        self.max_workers = max_workers
 
     def _current_batch_size(self) -> int:
         return int(
@@ -547,6 +626,41 @@ class VectorStoreManager:
         base_model = getattr(self.embed_model, "_wrapped_embed_model", self._base_embed_model)
         self.embed_model = _wrap_chunking_embed_model(base_model, batch_size)
         _ensure_embedding_model_available(self.embed_model)
+
+    def _process_document(self, index: int, doc: Document, splitter_factory):
+        text_content = _extract_doc_text(doc)
+        logger.debug(f"Processing document {index + 1}: Content length={len(text_content)}")
+
+        splitter = splitter_factory()
+        try:
+            nodes = splitter.get_nodes_from_documents([doc])
+            logger.debug(f"Document {index + 1} split into {len(nodes)} semantic chunks.")
+        except Exception as exc:  # noqa: BLE001 - fall back for splitter failures
+            logger.warning(
+                "Semantic splitting failed for document %s, falling back to SentenceSplitter. Error: %s",
+                index + 1,
+                exc,
+            )
+
+            safe_chunk_size = max(1024, len(str(getattr(doc, "extra_info", ""))) + 1)
+            logger.debug(
+                "Using SentenceSplitter chunk_size=%s for document %s to accommodate metadata of length %s.",
+                safe_chunk_size,
+                index + 1,
+                len(str(getattr(doc, "extra_info", ""))),
+            )
+            base_splitter = SentenceSplitter(chunk_size=safe_chunk_size)
+            nodes = base_splitter.get_nodes_from_documents([doc])
+            logger.debug(f"Document {index + 1} split into {len(nodes)} sentence chunks.")
+
+        filtered = [node for node in nodes if _get_node_content(node).strip()]
+        dropped = len(nodes) - len(filtered)
+        if dropped:
+            logger.debug(
+                "Dropped %s empty chunks for document %s before indexing.", dropped, index + 1
+            )
+
+        return filtered
 
     def create_vector_store(self, md_contents, meta_data):
         """
@@ -564,6 +678,9 @@ class VectorStoreManager:
         logger.debug(f"Number of markdown contents: {len(md_contents)}")
         logger.debug(f"Number of metadata entries: {len(meta_data)}")
 
+        repo_system_prompt = _build_repo_system_prompt(meta_data)
+        _apply_system_prompt(self.llm, repo_system_prompt)
+
         # Fail fast if the Ollama embedding model is unavailable, instead of
         # streaming a series of semantic-splitter fallbacks before the eventual
         # embed call fails during index construction.
@@ -575,7 +692,7 @@ class VectorStoreManager:
 
         # Initialize semantic chunker (SimpleNodeParser)
         logger.debug("Initializing semantic chunker (SimpleNodeParser).")
-        splitter = SemanticSplitterNodeParser(
+        splitter_factory = lambda: SemanticSplitterNodeParser(  # noqa: E731
             buffer_size=1,
             breakpoint_percentile_threshold=95,
             embed_model=self.embed_model,
@@ -585,40 +702,29 @@ class VectorStoreManager:
             Document(text=content, extra_info=meta) for content, meta in zip(md_contents, meta_data)
         ]
 
-        all_nodes = []
-        for i, doc in enumerate(documents):
-            text_content = _extract_doc_text(doc)
-            logger.debug(f"Processing document {i+1}: Content length={len(text_content)}")
+        worker_count = self.max_workers or os.cpu_count() or 4
+        worker_count = min(max(1, worker_count), len(documents))
+        logger.debug("Processing documents with ThreadPoolExecutor(max_workers=%s).", worker_count)
 
-            try:
-                # Try semantic splitting first
-                nodes = splitter.get_nodes_from_documents([doc])
-                logger.debug(f"Document {i+1} split into {len(nodes)} semantic chunks.")
+        results: dict[int, list] = {}
+        with ThreadPoolExecutor(max_workers=worker_count) as executor:
+            futures = {
+                executor.submit(self._process_document, idx, doc, splitter_factory): idx
+                for idx, doc in enumerate(documents)
+            }
 
-            except Exception as e:
-                # Fallback to baseline sentence splitting
-                logger.warning(
-                    f"Semantic splitting failed for document {i+1}, falling back to SentenceSplitter. Error: {e}"
-                )
+            for future in as_completed(futures):
+                doc_index = futures[future]
+                try:
+                    results[doc_index] = future.result()
+                except Exception as exc:  # noqa: BLE001 - propagate for visibility
+                    logger.exception(
+                        "Document %s failed during splitting; aborting vector store creation.",
+                        doc_index + 1,
+                    )
+                    raise exc
 
-                safe_chunk_size = max(1024, len(str(getattr(doc, "extra_info", ""))) + 1)
-                logger.debug(
-                    f"Using SentenceSplitter chunk_size={safe_chunk_size} for document {i+1} "
-                    f"to accommodate metadata of length {len(str(getattr(doc, 'extra_info', '')))}."
-                )
-                base_splitter = SentenceSplitter(chunk_size=safe_chunk_size)
-                nodes = base_splitter.get_nodes_from_documents([doc])
-                logger.debug(f"Document {i+1} split into {len(nodes)} sentence chunks.")
-
-            filtered = [node for node in nodes if _get_node_content(node).strip()]
-
-            dropped = len(nodes) - len(filtered)
-            if dropped:
-                logger.debug(
-                    "Dropped %s empty chunks for document %s before indexing.", dropped, i + 1
-                )
-
-            all_nodes.extend(filtered)
+        all_nodes = [node for idx in sorted(results) for node in results[idx]]
 
         all_nodes = _rechunk_oversized_nodes(all_nodes)
 

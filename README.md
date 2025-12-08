@@ -36,6 +36,12 @@ PapAIrus can auto-pull Ollama models when missing, but Ollama itself must be ins
   curl -fsSL https://ollama.com/install.sh | sh
   ollama serve
   ```
+- **Windows** (PowerShell):
+  ```powershell
+  winget install Ollama.Ollama
+  # After installation completes, start the Ollama service
+  ollama serve
+  ```
 
 By default, PapAIrus targets the `codegemma:instruct` model. If it is not present, the backend triggers `POST /api/pull` automatically before the first request. Auto-pull can be disabled via configuration if you prefer manual model management.
 

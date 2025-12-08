@@ -20,13 +20,14 @@ class GeminiBackend(LLMBackend):
         temperature: float,
         timeout: int,
     ) -> None:
+        super().__init__()
         self.api_key = api_key
         self.model = model
         self.temperature = temperature
         self.base_url = base_url.rstrip("/")
         self.timeout = timeout
         self._metadata = LLMMetadata(
-            model_name=model, context_window=None, num_output=None, type="gemini"
+            model_name=model, context_window=8192, num_output=1024, type="gemini"
         )
 
     def generate_docstring(

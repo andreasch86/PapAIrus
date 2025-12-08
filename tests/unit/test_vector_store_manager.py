@@ -9,6 +9,9 @@ pytest.importorskip("chromadb")
 from papairus.chat_with_repo.vector_store_manager import (
     _MAX_EMBED_CHARS,
     VectorStoreManager,
+    _ChunkingEmbeddingWrapper,
+    _apply_system_prompt,
+    _build_repo_system_prompt,
     _get_node_content,
     _rechunk_oversized_nodes,
 )
@@ -88,6 +91,14 @@ class DummyQueryEngine:
 
     def query(self, query):
         return types.SimpleNamespace(response="ok", metadata={})
+
+
+class RecordingLLM:
+    def __init__(self):
+        self.prompts: list[str] = []
+
+    def update_system_prompt(self, prompt: str) -> None:
+        self.prompts.append(prompt)
 
 
 class DummyEmbedModel:
@@ -237,6 +248,67 @@ def test_create_vector_store_filters_empty_chunks(monkeypatch, patched_manager):
 
     assert patched_manager.query_engine is not None
     assert patched_manager.query_engine.retriever.index.nodes == ["node-keep"]
+
+
+def test_system_prompt_applied_from_metadata(patched_manager):
+    patched_manager.llm = RecordingLLM()
+
+    md_contents = ["hello world"]
+    meta_data = [{"source": "src/app.py", "type": "Function", "name": "foo"}]
+
+    patched_manager.create_vector_store(md_contents, meta_data)
+
+    assert patched_manager.llm.prompts
+    prompt = patched_manager.llm.prompts[-1]
+    assert "src/app.py" in prompt
+    assert "Function" in prompt
+
+
+def test_create_vector_store_uses_thread_pool(monkeypatch, patched_manager):
+    captured = {}
+
+    class RecordingFuture:
+        def __init__(self, payload):
+            self._payload = payload
+
+        def result(self):
+            return self._payload
+
+        def __hash__(self):
+            return id(self)
+
+    class RecordingExecutor:
+        def __init__(self, max_workers):
+            captured["max_workers"] = max_workers
+            self._futures = []
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, exc_type, exc, tb):
+            return False
+
+        def submit(self, fn, *args, **kwargs):
+            result = fn(*args, **kwargs)
+            future = RecordingFuture(result)
+            self._futures.append(future)
+            return future
+
+    monkeypatch.setattr(
+        "papairus.chat_with_repo.vector_store_manager.ThreadPoolExecutor", RecordingExecutor
+    )
+    monkeypatch.setattr(
+        "papairus.chat_with_repo.vector_store_manager.as_completed", lambda futures: futures
+    )
+
+    patched_manager.max_workers = 8
+
+    md_contents = ["doc1", "doc2", "doc3"]
+    meta_data = [{"source": "a"}, {"source": "b"}, {"source": "c"}]
+
+    patched_manager.create_vector_store(md_contents, meta_data)
+
+    assert captured["max_workers"] == len(md_contents)
 
 
 def test_fallback_splitter_scales_with_metadata(monkeypatch, patched_manager):
@@ -1590,5 +1662,103 @@ def test_preflight_surfaces_embedding_transport_error(monkeypatch):
         _ensure_embedding_model_available(embed_model)
 
     assert "Embedding request to http://localhost:11434 failed" in str(excinfo.value)
+
+
+def test_build_repository_system_prompt_includes_examples():
+    meta = [
+        {"name": "file.py", "type": "File", "source": "repo/file.py"},
+        {"name": "function", "type": "FunctionDef"},
+    ]
+
+    prompt = _build_repo_system_prompt(meta)
+
+    assert "Examples of indexed items" in prompt
+    assert "from repo/file.py" in prompt
+
+
+def test_build_repository_system_prompt_handles_empty_examples():
+    prompt = _build_repo_system_prompt([])
+
+    assert "Examples of indexed items" not in prompt
+
+
+def test_apply_system_prompt_fallback_sets_dict():
+    class FailingLLM:
+        def update_system_prompt(self, _prompt):  # pragma: no cover - exercised via call
+            raise RuntimeError("fail")
+
+        @property
+        def system_prompt(self):  # pragma: no cover - getter not used
+            return ""
+
+        @system_prompt.setter
+        def system_prompt(self, _value):
+            raise RuntimeError("nope")
+
+    llm = FailingLLM()
+    _apply_system_prompt(llm, "context-prompt")
+
+    assert llm.__dict__["system_prompt"] == "context-prompt"
+
+
+def test_apply_system_prompt_sets_attribute_directly():
+    class SimpleLLM:
+        def __init__(self):
+            self.system_prompt = ""
+
+    llm = SimpleLLM()
+    _apply_system_prompt(llm, "direct-prompt")
+
+    assert llm.system_prompt == "direct-prompt"
+
+
+def test_chunking_wrapper_get_query_embedding_handles_wrapped():
+    class QueryEmbedModel(DummyEmbedModel):
+        def get_query_embedding(self, query):
+            return [len(query)]
+
+    wrapper = _ChunkingEmbeddingWrapper(QueryEmbedModel())
+
+    assert wrapper.get_query_embedding("hi") == [0.1, 0.2]
+
+
+def test_chunking_wrapper_http_error_raises(monkeypatch):
+    class BatchModel:
+        def get_text_embedding_batch(self, _batch):
+            raise RuntimeError("batch boom")
+
+    wrapper = _ChunkingEmbeddingWrapper(BatchModel())
+    monkeypatch.setattr(
+        wrapper, "_embed_batch_via_http", lambda *_: (_ for _ in ()).throw(ValueError("http fail"))
+    )
+
+    with pytest.raises(EmbeddingServiceError):
+        wrapper._get_text_embeddings(["a", "b"])
+
+
+def test_chunking_wrapper_recovers_from_base_init_typeerror(monkeypatch):
+    import papairus.chat_with_repo.vector_store_manager as vsm
+
+    original_init = vsm.BaseEmbedding.__init__
+
+    def flaky_init(self, *args, **kwargs):
+        fail_once = getattr(self, "_fail_once", True)
+        if fail_once:
+            self._fail_once = False
+            raise TypeError("boom")
+        return original_init(self, *args, **kwargs)
+
+    monkeypatch.setattr(vsm.BaseEmbedding, "__init__", flaky_init)
+
+    wrapper = _ChunkingEmbeddingWrapper(DummyEmbedModel())
+
+    assert wrapper._wrapped_embed_model.model_name == "dummy-embed"
+
+
+def test_create_vector_store_raises_on_process_failure(monkeypatch, patched_manager):
+    patched_manager._process_document = lambda *_args: (_ for _ in ()).throw(ValueError("split fail"))
+
+    with pytest.raises(ValueError):
+        patched_manager.create_vector_store(["text"], [{}])
 
 

@@ -21,13 +21,14 @@ class LocalGemmaBackend(LLMBackend):
         request_timeout: int = 60,
         auto_pull: bool = True,
     ) -> None:
+        super().__init__()
         self.model = model
         self.base_url = base_url.rstrip("/")
         self.temperature = temperature
         self.timeout = request_timeout
         self.auto_pull = auto_pull
         self._metadata = LLMMetadata(
-            model_name=model, context_window=None, num_output=None, type="local-gemma"
+            model_name=model, context_window=8192, num_output=1024, type="local-gemma"
         )
 
     def generate_docstring(
@@ -53,10 +54,12 @@ class LocalGemmaBackend(LLMBackend):
 
     def generate_response(self, messages: Sequence[ChatMessage]) -> LLMResponse:
         self._ensure_model()
+        normalized_messages = list(self._normalize_messages(messages))
         payload = {
             "model": self.model,
             "messages": [
-                {"role": message.role, "content": message.content} for message in messages
+                {"role": message.role, "content": str(message.content)}
+                for message in normalized_messages
             ],
             "options": {"temperature": self.temperature},
             "stream": False,

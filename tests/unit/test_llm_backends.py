@@ -87,3 +87,41 @@ def test_local_gemma_non_json_response(monkeypatch):
 
     with pytest.raises(RuntimeError):
         backend.generate_response([ChatMessage(role="user", content="hi")])
+
+
+def test_local_gemma_normalizes_non_string_content(monkeypatch):
+    def fake_get(url, timeout):
+        return FakeResponse({"models": [{"name": "codegemma:instruct"}]})
+
+    captured_payload = {}
+
+    def fake_post(url, json, timeout):
+        captured_payload["messages"] = json["messages"]
+        return FakeResponse(
+            {"message": {"content": "ok"}, "eval_count": 2, "prompt_eval_count": 1}, 200
+        )
+
+    monkeypatch.setattr("papairus.llm.backends.local_gemma.requests.get", fake_get)
+    monkeypatch.setattr("papairus.llm.backends.local_gemma.requests.post", fake_post)
+
+    class DummyTemplate:
+        def __str__(self):  # pragma: no cover - trivial
+            return "templated"
+
+    backend = LocalGemmaBackend(model="codegemma:instruct")
+    response = backend.generate_response(
+        [ChatMessage(role="user", content=DummyTemplate())]
+    )
+
+    assert response.message.content == "ok"
+    assert captured_payload["messages"] == [{"role": "user", "content": "templated"}]
+
+
+def test_llm_metadata_defaults():
+    backend = LocalGemmaBackend(model="codegemma:instruct")
+    metadata = backend.metadata
+
+    assert metadata.context_window == 8192
+    assert metadata.num_output == 1024
+    assert metadata.model_name == "codegemma:instruct"
+    assert metadata.is_chat_model is True
