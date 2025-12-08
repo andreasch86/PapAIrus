@@ -7,15 +7,16 @@ from papairus.settings import ChatCompletionSettings, SettingsManager
 
 
 def _select_repo_chat_settings(settings: ChatCompletionSettings) -> ChatCompletionSettings:
-    """Ensure chat-with-repo uses the local Gemma/Ollama stack."""
+    """Pin chat-with-repo to the CodeGemma instruct model served by Ollama."""
 
-    if settings.model == "gemma-local":
-        return settings
+    update = {"model": "local-gemma", "ollama_model": "codegemma:instruct"}
 
-    logger.info(
-        "chat-with-repo supports only Ollama/Gemma; overriding model to 'gemma-local'."
-    )
-    return settings.model_copy(update={"model": "gemma-local"})
+    if settings.model != "local-gemma" or settings.ollama_model != "codegemma:instruct":
+        logger.info(
+            "chat-with-repo supports only the Ollama CodeGemma instruct model; forcing configuration."
+        )
+
+    return settings.model_copy(update=update)
 
 
 def main():

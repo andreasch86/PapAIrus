@@ -1,8 +1,8 @@
+import ast
 from pathlib import Path
 
-from llama_index.core.llms import ChatMessage
-
 from papairus.docstring_generator import DocstringGenerator
+from papairus.llm.backends.base import ChatMessage, LLMBackend
 
 
 def test_adds_missing_docstring(tmp_path):
@@ -59,9 +59,12 @@ def test_llm_backend_uses_client(tmp_path):
     sample = tmp_path / "llm_sample.py"
     sample.write_text("def shout(text):\n    return text.upper()\n")
 
-    class FakeLLM:
-        def chat(self, messages):
-            return type("Resp", (), {"message": type("Msg", (), {"content": '"""Shout text.\n\nArgs:\n    text (str): Input.\nReturns:\n    str: Uppercase.\n"""'})()})()
+    class FakeLLM(LLMBackend):
+        def generate_response(self, messages):
+            return None  # pragma: no cover - not used in this test
+
+        def generate_docstring(self, code_snippet: str, *, style: str = "google", existing_docstring=None):
+            return """Shout text.\n\nArgs:\n    text (str): Input.\nReturns:\n    str: Uppercase.\n"""
 
     generator = DocstringGenerator(tmp_path, backend="gemini", llm_client=FakeLLM())
     updated = generator.run()
@@ -76,25 +79,17 @@ def test_llm_backend_uses_chat_messages(tmp_path):
     sample = tmp_path / "llm_chatmessage.py"
     sample.write_text("def ping(x):\n    return x\n")
 
-    class RecordingLLM:
+    class RecordingLLM(LLMBackend):
         def __init__(self):
             self.messages = None
 
-        def chat(self, messages):
+        def generate_response(self, messages):  # pragma: no cover - docstring path only
             self.messages = messages
-            return type(
-                "Resp",
-                (),
-                {
-                    "message": type(
-                        "Msg",
-                        (),
-                        {
-                            "content": '"""Ping value.\n\nArgs:\n    x (Any): Description of x.\nReturns:\n    Any: Description of return value.\n"""',
-                        },
-                    )(),
-                },
-            )()
+            return None
+
+        def generate_docstring(self, code_snippet: str, *, style: str = "google", existing_docstring=None):
+            self.messages = [ChatMessage(role="user", content=code_snippet)]
+            return '"""Ping value.\n\nArgs:\n    x (Any): Description of x.\nReturns:\n    Any: Description of return value.\n"""'
 
     llm = RecordingLLM()
     generator = DocstringGenerator(tmp_path, backend="gemma", llm_client=llm)
@@ -103,6 +98,89 @@ def test_llm_backend_uses_chat_messages(tmp_path):
     assert sample in updated
     assert llm.messages and isinstance(llm.messages[0], ChatMessage)
     assert "Ping value." in sample.read_text()
+
+
+def test_llm_backend_strips_code_blocks_in_docstring(tmp_path):
+    sample = tmp_path / "llm_code_block.py"
+    sample.write_text("class Sample:\n    pass\n")
+
+    class CodeBlockLLM(LLMBackend):
+        def generate_response(self, messages):  # pragma: no cover - not used
+            return None
+
+        def generate_docstring(self, code_snippet: str, *, style: str = "google", existing_docstring=None):
+            return (
+                "```python\n"
+                "class Sample:\n"
+                '    """Sample docstring."""\n'
+                "```"
+            )
+
+    generator = DocstringGenerator(tmp_path, backend="gemma", llm_client=CodeBlockLLM())
+    updated = generator.run()
+
+    assert sample in updated
+    parsed = ast.parse(sample.read_text())
+    class_node = parsed.body[0]
+    assert isinstance(class_node, ast.ClassDef)
+    assert ast.get_docstring(class_node) == "Sample docstring."
+
+
+def test_llm_backend_strips_language_hints_and_recovers_docstring(tmp_path):
+    sample = tmp_path / "llm_language_hint.py"
+    sample.write_text("class LLMUsage:\n    pass\n")
+
+    class LanguageHintLLM(LLMBackend):
+        def generate_response(self, messages):  # pragma: no cover - not used
+            return None
+
+        def generate_docstring(
+            self, code_snippet: str, *, style: str = "google", existing_docstring=None
+        ):
+            return (
+                "python\n"
+                "class LLMUsage:\n"
+                '    """A class to track usage."""\n'
+                "    def __init__(self, prompt_tokens: int, completion_tokens: int):\n"
+                "        self.prompt_tokens = prompt_tokens\n"
+                "        self.completion_tokens = completion_tokens\n"
+            )
+
+    generator = DocstringGenerator(tmp_path, backend="gemma", llm_client=LanguageHintLLM())
+    updated = generator.run()
+
+    assert sample in updated
+    parsed = ast.parse(sample.read_text())
+    class_node = parsed.body[0]
+    assert isinstance(class_node, ast.ClassDef)
+    assert ast.get_docstring(class_node) == "A class to track usage."
+
+
+def test_llm_backend_refreshes_existing_docstrings(tmp_path):
+    sample = tmp_path / "llm_refresh_existing.py"
+    sample.write_text('def div(a, b):\n    """Divide two values."""\n    return a / b\n')
+
+    class RefreshingLLM(LLMBackend):
+        def generate_response(self, messages):  # pragma: no cover - not used
+            return None
+
+        def generate_docstring(
+            self, code_snippet: str, *, style: str = "google", existing_docstring=None
+        ):
+            return (
+                """Compute division while guarding zero values.\n\n"
+                "Args:\n    a (Any): Dividend.\n    b (Any): Divisor.\n"
+                "Returns:\n    Any: The division result.\n"
+                "Raises:\n    ZeroDivisionError: If b is zero.\n"""
+            )
+
+    generator = DocstringGenerator(tmp_path, backend="gemma", llm_client=RefreshingLLM())
+    updated = generator.run()
+
+    assert sample in updated
+    content = sample.read_text()
+    assert "Compute division while guarding zero values." in content
+    assert "ZeroDivisionError" in content
 
 
 def test_progress_callback_reports_status(tmp_path):

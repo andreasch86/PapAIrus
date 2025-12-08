@@ -239,6 +239,53 @@ def test_create_vector_store_filters_empty_chunks(monkeypatch, patched_manager):
     assert patched_manager.query_engine.retriever.index.nodes == ["node-keep"]
 
 
+def test_create_vector_store_uses_thread_pool(monkeypatch, patched_manager):
+    captured = {}
+
+    class RecordingFuture:
+        def __init__(self, payload):
+            self._payload = payload
+
+        def result(self):
+            return self._payload
+
+        def __hash__(self):
+            return id(self)
+
+    class RecordingExecutor:
+        def __init__(self, max_workers):
+            captured["max_workers"] = max_workers
+            self._futures = []
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, exc_type, exc, tb):
+            return False
+
+        def submit(self, fn, *args, **kwargs):
+            result = fn(*args, **kwargs)
+            future = RecordingFuture(result)
+            self._futures.append(future)
+            return future
+
+    monkeypatch.setattr(
+        "papairus.chat_with_repo.vector_store_manager.ThreadPoolExecutor", RecordingExecutor
+    )
+    monkeypatch.setattr(
+        "papairus.chat_with_repo.vector_store_manager.as_completed", lambda futures: futures
+    )
+
+    patched_manager.max_workers = 8
+
+    md_contents = ["doc1", "doc2", "doc3"]
+    meta_data = [{"source": "a"}, {"source": "b"}, {"source": "c"}]
+
+    patched_manager.create_vector_store(md_contents, meta_data)
+
+    assert captured["max_workers"] == len(md_contents)
+
+
 def test_fallback_splitter_scales_with_metadata(monkeypatch, patched_manager):
     long_meta = "x" * 5000
     captured = {}

@@ -99,7 +99,7 @@ def patch_dependencies(monkeypatch):
 
 
 def test_generate_queries_uses_llm(patch_dependencies, tmp_path):
-    settings = ChatCompletionSettings(model="gemma-local")
+    settings = ChatCompletionSettings(model="local-gemma")
     assistant = rag_module.RepoAssistant(settings, tmp_path / "db.json")
 
     queries = assistant.generate_queries("ask?", num_queries=3)
@@ -108,7 +108,7 @@ def test_generate_queries_uses_llm(patch_dependencies, tmp_path):
 
 
 def test_generate_queries_strips_formatting(monkeypatch, patch_dependencies, tmp_path):
-    settings = ChatCompletionSettings(model="gemma-local")
+    settings = ChatCompletionSettings(model="local-gemma")
     assistant = rag_module.RepoAssistant(settings, tmp_path / "db.json")
 
     monkeypatch.setattr(
@@ -129,7 +129,7 @@ def test_generate_queries_strips_formatting(monkeypatch, patch_dependencies, tmp
 
 
 def test_rerank_sorts_documents(monkeypatch, patch_dependencies, tmp_path):
-    settings = ChatCompletionSettings(model="gemma-local")
+    settings = ChatCompletionSettings(model="local-gemma")
     assistant = rag_module.RepoAssistant(settings, tmp_path / "db.json")
 
     docs = ["doc-a", "doc-b"]
@@ -139,7 +139,7 @@ def test_rerank_sorts_documents(monkeypatch, patch_dependencies, tmp_path):
 
 
 def test_rerank_gracefully_handles_invalid_json(monkeypatch, patch_dependencies, tmp_path):
-    settings = ChatCompletionSettings(model="gemma-local")
+    settings = ChatCompletionSettings(model="local-gemma")
     assistant = rag_module.RepoAssistant(settings, tmp_path / "db.json")
 
     # Force an invalid response payload from the LLM chat call
@@ -152,7 +152,7 @@ def test_rerank_gracefully_handles_invalid_json(monkeypatch, patch_dependencies,
 
 
 def test_rag_and_rag_ar_delegate_to_llms(patch_dependencies, tmp_path):
-    settings = ChatCompletionSettings(model="gemma-local")
+    settings = ChatCompletionSettings(model="local-gemma")
     assistant = rag_module.RepoAssistant(settings, tmp_path / "db.json")
 
     assert assistant.rag("prompt", ["doc"]) == "rag-text"
@@ -160,7 +160,7 @@ def test_rag_and_rag_ar_delegate_to_llms(patch_dependencies, tmp_path):
 
 
 def test_respond_executes_full_flow(monkeypatch, patch_dependencies, tmp_path):
-    settings = ChatCompletionSettings(model="gemma-local")
+    settings = ChatCompletionSettings(model="local-gemma")
     assistant = rag_module.RepoAssistant(settings, tmp_path / "db.json")
 
     monkeypatch.setattr(assistant, "generate_queries", lambda *_args, **_kwargs: ["q1", "q2"])
@@ -176,7 +176,7 @@ def test_respond_executes_full_flow(monkeypatch, patch_dependencies, tmp_path):
 
 
 def test_respond_skips_empty_queries_and_returns_strings(monkeypatch, patch_dependencies, tmp_path):
-    settings = ChatCompletionSettings(model="gemma-local")
+    settings = ChatCompletionSettings(model="local-gemma")
     assistant = rag_module.RepoAssistant(settings, tmp_path / "db.json")
 
     seen_queries: list[str] = []
@@ -198,7 +198,7 @@ def test_respond_skips_empty_queries_and_returns_strings(monkeypatch, patch_depe
 
 
 def test_respond_falls_back_to_message_when_no_queries(monkeypatch, patch_dependencies, tmp_path):
-    settings = ChatCompletionSettings(model="gemma-local")
+    settings = ChatCompletionSettings(model="local-gemma")
     assistant = rag_module.RepoAssistant(settings, tmp_path / "db.json")
 
     seen_queries: list[str] = []
@@ -219,7 +219,7 @@ def test_respond_falls_back_to_message_when_no_queries(monkeypatch, patch_depend
 
 
 def test_respond_returns_fallback_when_no_results(monkeypatch, patch_dependencies, tmp_path):
-    settings = ChatCompletionSettings(model="gemma-local")
+    settings = ChatCompletionSettings(model="local-gemma")
     assistant = rag_module.RepoAssistant(settings, tmp_path / "db.json")
 
     monkeypatch.setattr(assistant.vector_store_manager, "query_store", lambda *_: [])
