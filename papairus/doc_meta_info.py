@@ -299,9 +299,7 @@ def find_all_referencer(
     try:
         lines = Path(abs_path).read_text().splitlines(True)
     except FileNotFoundError:
-        logger.error(
-            f"File not found when searching references: {abs_path}"  # noqa: G004
-        )
+        logger.error(f"File not found when searching references: {abs_path}")  # noqa: G004
         return []
 
     if line_number < 1 or line_number > len(lines):
@@ -318,9 +316,7 @@ def find_all_referencer(
     script = jedi.Script(path=abs_path)
     try:
         if in_file_only:
-            references = script.get_references(
-                line=line_number, column=safe_column, scope="file"
-            )
+            references = script.get_references(line=line_number, column=safe_column, scope="file")
         else:
             references = script.get_references(line=line_number, column=safe_column)
         # English variable_name English，English

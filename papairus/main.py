@@ -7,10 +7,10 @@ import click
 import git
 from pydantic import SecretStr, ValidationError
 
+from papairus.change_detector import ChangeDetector
 from papairus.doc_meta_info import DocItem, MetaInfo
 from papairus.docstring_generator import DocstringGenerator
 from papairus.exceptions import NoChangesWarning
-from papairus.change_detector import ChangeDetector
 from papairus.llm_provider import build_llm
 from papairus.log import logger, set_logger_level_from_config
 from papairus.runner import Runner
@@ -60,15 +60,11 @@ def _suggest_docs_refresh(repo: git.Repo, docs_path: Path, docs_folder_name: str
 
     change_detector = ChangeDetector(repo.working_tree_dir)
     staged = change_detector.get_staged_pys()
-    unstaged = [
-        diff.b_path for diff in repo.index.diff(None) if diff.b_path.endswith(".py")
-    ]
+    unstaged = [diff.b_path for diff in repo.index.diff(None) if diff.b_path.endswith(".py")]
     changed_files = set(staged.keys()) | set(unstaged)
 
     if not changed_files:
-        click.echo(
-            f"Docs directory {docs_path} already exists. No pending code changes detected."
-        )
+        click.echo(f"Docs directory {docs_path} already exists. No pending code changes detected.")
         return
 
     click.echo(
@@ -82,9 +78,9 @@ def _suggest_docs_refresh(repo: git.Repo, docs_path: Path, docs_folder_name: str
 @click.option(
     "--model",
     "-m",
-    default="gemini-2.5-flash",
+    default="local-gemma",
     show_default=True,
-    help="Specifies the model to use for completion (gemma-local or any Gemini model starting with 'gemini-').",
+    help="Specifies the model to use for completion (local-gemma or any Gemini model starting with 'gemini-').",
     type=str,
 )
 @click.option(
@@ -374,7 +370,7 @@ def chat_with_repo():
     default=None,
     help=(
         "Model identifier to use for LLM-based docstrings. Defaults to a Gemini"
-        " or Gemma model based on the backend."
+        " or local Gemma model based on the backend."
     ),
 )
 @click.option(
@@ -410,7 +406,7 @@ def chat_with_repo():
 )
 @click.option(
     "--ollama-model",
-    default="gemma:2b",
+    default="codegemma:instruct",
     show_default=True,
     help="Ollama model name when using the Gemma backend.",
 )
@@ -434,7 +430,7 @@ def generate_docstrings(
     if backend != "ast":
         selected_model = model
         if selected_model is None:
-            selected_model = "gemini-2.5-flash" if backend == "gemini" else "gemma-local"
+            selected_model = "gemini-2.5-flash" if backend == "gemini" else "local-gemma"
 
         resolved_gemini_api_key = gemini_api_key or os.getenv("GEMINI_API_KEY")
 
@@ -445,9 +441,7 @@ def generate_docstrings(
                 request_timeout=request_timeout,
                 gemini_base_url=gemini_base_url,
                 gemini_api_key=(
-                    SecretStr(resolved_gemini_api_key)
-                    if resolved_gemini_api_key
-                    else None
+                    SecretStr(resolved_gemini_api_key) if resolved_gemini_api_key else None
                 ),
                 ollama_base_url=ollama_base_url,
                 ollama_model=ollama_model,

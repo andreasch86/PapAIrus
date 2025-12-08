@@ -40,7 +40,6 @@ class ProjectSettings(BaseSettings):
             return "English (UK)"
 
         raise ValueError("PapAIrus only supports UK English output.")
-        return "English (UK)"
 
     @field_validator("log_level", mode="before")
     @classmethod
@@ -53,14 +52,16 @@ class ProjectSettings(BaseSettings):
 
 
 class ChatCompletionSettings(BaseSettings):
-    model: str = "gemini-2.5-flash"  # Gemini (API key) or local Gemma are allowed.
+    engine: Optional[str] = None
+    model: str = "local-gemma"  # Local Gemma (via Ollama) by default; Gemini allowed explicitly.
     temperature: PositiveFloat = 0.2
     request_timeout: PositiveInt = 60
     gemini_base_url: str = "https://aiplatform.googleapis.com/v1"
     gemini_api_key: Optional[SecretStr] = Field(None, exclude=True)
     ollama_base_url: str = "http://localhost:11434"
-    ollama_model: str = "gemma:2b"
+    ollama_model: str = "codegemma:instruct"
     ollama_embedding_model: str = "nomic-embed-text"
+    ollama_auto_pull: bool = True
 
     @field_validator("gemini_base_url", mode="before")
     @classmethod
@@ -77,12 +78,11 @@ class ChatCompletionSettings(BaseSettings):
     def validate_model(cls, value: str) -> str:
         if value.startswith("gemini-"):
             return value
-        if value == "gemma-local":
-            return value
+        if value == "local-gemma" or value.startswith("local-gemma"):
+            return "local-gemma"
         raise ValueError(
-            "Model must be gemma-local (self-hosted) or a Gemini model name starting with 'gemini-'."
+            "Model must be local-gemma (self-hosted) or a Gemini model name starting with 'gemini-'."
         )
-        return value
 
     @field_validator("gemini_api_key")
     @classmethod
@@ -96,6 +96,7 @@ class ChatCompletionSettings(BaseSettings):
 class Setting(BaseSettings):
     project: ProjectSettings = {}  # type: ignore
     chat_completion: ChatCompletionSettings = {}  # type: ignore
+    docstring_llm: ChatCompletionSettings = {}  # type: ignore
 
 
 class SettingsManager:
@@ -144,6 +145,7 @@ class SettingsManager:
         cls._setting_instance = Setting(
             project=project_settings,
             chat_completion=chat_completion_settings,
+            docstring_llm=chat_completion_settings,
         )
 
 
