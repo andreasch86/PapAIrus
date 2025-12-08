@@ -7,6 +7,7 @@ import re
 import textwrap
 from dataclasses import dataclass
 from pathlib import Path
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from typing import Any, Callable, Iterable, List, Optional, Sequence
 
 from papairus.llm.backends.base import ChatMessage, LLMBackend
@@ -46,6 +47,7 @@ class DocstringGenerator:
         backend: str = "ast",
         llm_client: Optional[Any] = None,
         refresh_existing_llm_docstrings: bool = True,
+        force: bool = False,
     ) -> None:
         self.root = Path(root)
         self.excluded_directories = set(
@@ -56,33 +58,47 @@ class DocstringGenerator:
             raise ValueError("backend must be one of: ast, gemini, gemma, llm")
         self.llm_client = llm_client
         self.refresh_existing_llm_docstrings = refresh_existing_llm_docstrings
+        self.force = force
 
     def run(
         self,
         dry_run: bool = False,
         progress_callback: Optional[Callable[[Path, str], None]] = None,
+        max_workers: int = 1,
     ) -> List[Path]:
         """Generate docstrings for all Python files under ``root``.
 
         Args:
             dry_run: When ``True``, report files that would change without writing
                 them.
+            progress_callback: Callback function to report progress.
+            max_workers: Number of threads to use for processing.
 
         Returns:
             A list of file paths that require or received docstring updates.
         """
 
         updated_files: List[Path] = []
-        for file_path in self._python_files():
-            if progress_callback:
-                progress_callback(file_path, "start")
+        with ThreadPoolExecutor(max_workers=max_workers) as executor:
+            future_to_file = {}
+            for file_path in self._python_files():
+                if progress_callback:
+                    progress_callback(file_path, "start")
+                future = executor.submit(self._update_file, file_path, dry_run=dry_run)
+                future_to_file[future] = file_path
 
-            changed = self._update_file(file_path, dry_run=dry_run)
-            if changed:
-                updated_files.append(file_path)
+            for future in as_completed(future_to_file):
+                file_path = future_to_file[future]
+                try:
+                    changed = future.result()
+                    if changed:
+                        updated_files.append(file_path)
+                    if progress_callback:
+                        progress_callback(file_path, "updated" if changed else "skipped")
+                except Exception:
+                    if progress_callback:
+                        progress_callback(file_path, "skipped")
 
-            if progress_callback:
-                progress_callback(file_path, "updated" if changed else "skipped")
         return updated_files
 
     def _python_files(self) -> Iterable[Path]:
@@ -175,7 +191,7 @@ class DocstringGenerator:
         self, node: ast.AST, existing_docstring: Optional[str], body_indent: str
     ) -> Optional[List[str]]:
         if isinstance(node, ast.ClassDef):
-            if existing_docstring:
+            if existing_docstring and not self.force:
                 return None
             summary = self._summarize_name(node.name)
             return self._format_docstring(summary, [], None, body_indent)
@@ -189,7 +205,7 @@ class DocstringGenerator:
 
         if existing_docstring and not self._docstring_incomplete(
             existing_docstring, parameters, needs_return
-        ):
+        ) and not self.force:
             return None
 
         summary = self._existing_summary(existing_docstring) or self._summarize_name(node.name)
@@ -211,13 +227,13 @@ class DocstringGenerator:
             parameters = self._extract_parameters(node)
             return_info = self._extract_returns(node)
             needs_return = return_info is not None
-            needs_update = refresh_existing or existing_docstring is None
+            needs_update = self.force or refresh_existing or existing_docstring is None
             if not needs_update:
                 needs_update = self._docstring_incomplete(
                     existing_docstring, parameters, needs_return
                 )
         elif isinstance(node, ast.ClassDef):
-            needs_update = refresh_existing or existing_docstring is None
+            needs_update = self.force or refresh_existing or existing_docstring is None
         else:
             return None
 

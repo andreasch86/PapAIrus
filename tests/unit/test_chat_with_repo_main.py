@@ -41,7 +41,8 @@ def test_main_executes_with_stubs(monkeypatch, tmp_path):
                 extract_data=lambda: (["content"], [{"meta": True}])
             )
             self.vector_store_manager = types.SimpleNamespace(
-                create_vector_store=lambda *_args: calls.setdefault("created", True)
+                create_vector_store=lambda *_args: calls.setdefault("created", True),
+                chroma_db_path=tmp_path / "chroma_db"
             )
 
         def respond(self, *_args, **_kwargs):
@@ -58,4 +59,55 @@ def test_main_executes_with_stubs(monkeypatch, tmp_path):
     chat_main_module.main()
 
     assert calls["created"] is True
+    assert "gradio" in calls
+
+def test_main_skips_creation_if_hash_matches(monkeypatch, tmp_path):
+    calls = {}
+
+    def fake_get_setting():
+        return Setting(
+            project=ProjectSettings(target_repo=tmp_path),
+            chat_completion=ChatCompletionSettings(model="local-gemma"),
+        )
+
+    monkeypatch.setattr(SettingsManager, "get_setting", staticmethod(fake_get_setting))
+
+    class DummyAssistant:
+        def __init__(self, chat_settings, db_path):
+            self.chat_settings = chat_settings
+            self.db_path = db_path
+            self.json_data = types.SimpleNamespace(
+                extract_data=lambda: (["content"], [{"meta": True}])
+            )
+            self.vector_store_manager = types.SimpleNamespace(
+                create_vector_store=lambda *_args: calls.setdefault("created", True),
+                chroma_db_path=tmp_path / "chroma_db"
+            )
+
+        def respond(self, *_args, **_kwargs):
+            calls["respond"] = True
+
+    monkeypatch.setattr(chat_main_module, "RepoAssistant", DummyAssistant)
+
+    class DummyGradio:
+        def __init__(self, callback):
+            calls["gradio"] = callback
+
+    monkeypatch.setattr(chat_main_module, "GradioInterface", DummyGradio)
+
+    # Setup files
+    db_path = tmp_path / ".project_doc_record" / "project_hierarchy.json"
+    db_path.parent.mkdir(parents=True, exist_ok=True)
+    db_path.write_text("content")
+
+    import hashlib
+    hash_val = hashlib.md5(b"content").hexdigest()
+
+    chroma_path = tmp_path / "chroma_db"
+    chroma_path.mkdir(parents=True, exist_ok=True)
+    (chroma_path / "vector_store_hash.txt").write_text(hash_val)
+
+    chat_main_module.main()
+
+    assert "created" not in calls
     assert "gradio" in calls

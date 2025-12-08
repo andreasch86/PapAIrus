@@ -11,25 +11,19 @@ latest_verison_substring = "_latest_version.py"
 
 
 def make_fake_files():
-    """Englishgit statusEnglish。English：
-    1. English，Englishadd。English
-    2. English，Englishadd，Englishfake_file，Englishgit statusEnglish
-    3. English，Englishadd，Englishfake_file，Englishgit statusEnglish
-    English: Englishlatest_verison_substringEnglish
-    """
     delete_fake_files()
     setting = SettingsManager.get_setting()
 
     repo = git.Repo(setting.project.target_repo)
-    unstaged_changes = repo.index.diff(None)  # Englishgit statusEnglish，English
-    untracked_files = repo.untracked_files  # English，EnglishgitEnglish
+    unstaged_changes = repo.index.diff(None)
+    untracked_files = repo.untracked_files
 
-    jump_files = []  # Englishparse、English，English
+    jump_files = []
     for file_name in untracked_files:
         if file_name.endswith(".py"):
             print(f"{Fore.LIGHTMAGENTA_EX}[SKIP untracked files]: {Style.RESET_ALL}{file_name}")
             jump_files.append(file_name)
-    for diff_file in unstaged_changes.iter_change_type("A"):  # English、EnglishaddEnglish，English
+    for diff_file in unstaged_changes.iter_change_type("A"):
         if diff_file.a_path.endswith(latest_verison_substring):
             logger.error(
                 "FAKE_FILE_IN_GIT_STATUS detected! suggest to use `delete_fake_files` and re-generate document"
@@ -40,13 +34,13 @@ def make_fake_files():
     file_path_reflections = {}
     for diff_file in itertools.chain(
         unstaged_changes.iter_change_type("M"), unstaged_changes.iter_change_type("D")
-    ):  # English
+    ):
         if diff_file.a_path.endswith(latest_verison_substring):
             logger.error(
                 "FAKE_FILE_IN_GIT_STATUS detected! suggest to use `delete_fake_files` and re-generate document"
             )
             exit()
-        now_file_path = diff_file.a_path  # Englishrepo_pathEnglish
+        now_file_path = diff_file.a_path
         if now_file_path.endswith(".py"):
             raw_file_content = diff_file.a_blob.data_stream.read().decode("utf-8")
             latest_file_path = now_file_path[:-3] + latest_verison_substring
@@ -69,16 +63,14 @@ def make_fake_files():
                     pass
             with open(os.path.join(setting.project.target_repo, now_file_path), "w") as writer:
                 writer.write(raw_file_content)
-            file_path_reflections[now_file_path] = latest_file_path  # realEnglishfake
+            file_path_reflections[now_file_path] = latest_file_path
     return file_path_reflections, jump_files
 
 
 def delete_fake_files():
-    """English，Englishfake_file"""
     setting = SettingsManager.get_setting()
 
     def gci(filepath):
-        # EnglishfilepathEnglish，English
         files = os.listdir(filepath)
         for fi in files:
             fi_d = os.path.join(filepath, fi)

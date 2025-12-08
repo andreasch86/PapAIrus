@@ -16,6 +16,7 @@ from papairus.chat_engine import ChatEngine
 from papairus.doc_meta_info import DocItem, DocItemStatus, MetaInfo, need_to_generate
 from papairus.file_handler import FileHandler
 from papairus.log import logger
+from papairus.markdown_manager import MarkdownManager
 from papairus.multi_task_dispatch import worker
 from papairus.project_manager import ProjectManager
 from papairus.settings import SettingsManager
@@ -40,13 +41,19 @@ class Runner:
             file_path_reflections, jump_files = make_fake_files()
             self.meta_info = MetaInfo.init_meta_info(file_path_reflections, jump_files)
             self.meta_info.checkpoint(target_dir_path=self.absolute_project_hierarchy_path)
-        else:  # English.project_hierarchy，English
+        else:
             self.meta_info = MetaInfo.from_checkpoint_path(self.absolute_project_hierarchy_path)
 
-        self.meta_info.checkpoint(  # English.project_doc_recordEnglish
+        self.meta_info.checkpoint(
             target_dir_path=self.absolute_project_hierarchy_path
         )
         self.runner_lock = threading.Lock()
+        self.markdown_manager = MarkdownManager(
+            target_repo=self.setting.project.target_repo,
+            markdown_docs_name=self.setting.project.markdown_docs_name,
+            meta_info_provider=lambda: self.meta_info,
+            lock=self.runner_lock,
+        )
 
     def get_all_pys(self, directory):
         """
@@ -68,7 +75,6 @@ class Runner:
         return python_files
 
     def generate_doc_for_a_single_item(self, doc_item: DocItem):
-        """English"""
         try:
             if not need_to_generate(doc_item, self.setting.project.ignore_list):
                 print(f"Content ignored/Document generated, skipping: {doc_item.get_full_name()}")
@@ -90,7 +96,6 @@ class Runner:
 
     def first_generate(self):
         """
-        English，English。
         """
         logger.info("Starting to generate documentation")
         check_task_available_func = partial(
@@ -107,7 +112,6 @@ class Runner:
         self.meta_info.print_task_list(task_manager.task_dict)
 
         try:
-            # English
             threads = [
                 threading.Thread(
                     target=worker,
@@ -124,10 +128,8 @@ class Runner:
             for thread in threads:
                 thread.join()
 
-            # English
-            self.markdown_refresh()
+            self.markdown_manager.markdown_refresh()
 
-            # English
             self.meta_info.document_version = self.change_detector.repo.head.commit.hexsha
             self.meta_info.in_generation_process = False
             self.meta_info.checkpoint(target_dir_path=self.absolute_project_hierarchy_path)
@@ -139,94 +141,6 @@ class Runner:
             logger.error(
                 f"An error occurred: {e}. {before_task_len - len(task_manager.task_dict)} docs are generated at this time"
             )
-
-    def markdown_refresh(self):
-        """EnglishmarkdownEnglish"""
-        with self.runner_lock:
-            # English markdown English
-            markdown_folder = (
-                Path(self.setting.project.target_repo) / self.setting.project.markdown_docs_name
-            )
-
-            # English
-            if markdown_folder.exists():
-                logger.debug(f"Deleting existing contents of {markdown_folder}")
-                shutil.rmtree(markdown_folder)
-            markdown_folder.mkdir(parents=True, exist_ok=True)
-            logger.debug(f"Created markdown folder at {markdown_folder}")
-
-        # English markdown
-        file_item_list = self.meta_info.get_all_files()
-        logger.debug(f"Found {len(file_item_list)} files to process.")
-
-        for file_item in tqdm(file_item_list):
-            # English
-            def recursive_check(doc_item) -> bool:
-                if doc_item.md_content:
-                    return True
-                for child in doc_item.children.values():
-                    if recursive_check(child):
-                        return True
-                return False
-
-            if not recursive_check(file_item):
-                logger.debug(
-                    f"No documentation content for: {file_item.get_full_name()}, skipping."
-                )
-                continue
-
-            # English markdown English
-            markdown = ""
-            for child in file_item.children.values():
-                markdown += self.to_markdown(child, 2)
-
-            if not markdown:
-                logger.warning(f"No markdown content generated for: {file_item.get_full_name()}")
-                continue
-
-            # English
-            file_path = Path(
-                self.setting.project.markdown_docs_name
-            ) / file_item.get_file_name().replace(".py", ".md")
-            abs_file_path = self.setting.project.target_repo / file_path
-            logger.debug(f"Writing markdown to: {abs_file_path}")
-
-            # English
-            abs_file_path.parent.mkdir(parents=True, exist_ok=True)
-            logger.debug(f"Ensured directory exists: {abs_file_path.parent}")
-
-            # English
-            with self.runner_lock:
-                for attempt in range(3):  # English3English
-                    try:
-                        with open(abs_file_path, "w", encoding="utf-8") as file:
-                            file.write(markdown)
-                        logger.debug(f"Successfully wrote to {abs_file_path}")
-                        break
-                    except IOError as e:
-                        logger.error(
-                            f"Failed to write {abs_file_path} on attempt {attempt + 1}: {e}"
-                        )
-                        time.sleep(1)  # English
-
-        logger.info(
-            f"Markdown documents have been refreshed at {self.setting.project.markdown_docs_name}"
-        )
-
-    def to_markdown(self, item, now_level: int) -> str:
-        """English markdown English"""
-        markdown_content = "#" * now_level + f" {item.item_type.to_str()} {item.obj_name}"
-        if "params" in item.content.keys() and item.content["params"]:
-            markdown_content += f"({', '.join(item.content['params'])})"
-        markdown_content += "\n"
-        if item.md_content:
-            markdown_content += f"{item.md_content[-1]}\n"
-        else:
-            markdown_content += "Doc is waiting to be generated...\n"
-        for child in item.children.values():
-            markdown_content += self.to_markdown(child, now_level + 1)
-            markdown_content += "***\n"
-        return markdown_content
 
     def git_commit(self, commit_message):
         try:
@@ -248,38 +162,26 @@ class Runner:
         """
 
         if self.meta_info.document_version == "":
-            # Englishdocument versionEnglishprocessEnglish(English)
-            self.first_generate()  # English，Englishfirst_generateEnglish
+            self.first_generate()
             self.meta_info.checkpoint(
                 target_dir_path=self.absolute_project_hierarchy_path,
                 flash_reference_relation=True,
-            )  # EnglishmetaEnglish（English）English.project_doc_recordEnglish
+            )
             return
 
-        if not self.meta_info.in_generation_process:  # English，English
+        if not self.meta_info.in_generation_process:
             logger.info("Starting to detect changes.")
 
-            """English
-            1.Englishproject-hierachy
-            2.EnglishhierarchyEnglishmerge,English：
-            - English：Englishdoc
-            - English、English：EnglishdocEnglish(English，English)
-            - English：Englishobj-docEnglish
 
-            mergeEnglishnew_meta_infoEnglish：
-            1.English，Englishmetainfo mergeEnglish
-            2.Englishobj，EnglishmetaEnglish，English
-            3.English，English"""
             file_path_reflections, jump_files = make_fake_files()
             new_meta_info = MetaInfo.init_meta_info(file_path_reflections, jump_files)
             new_meta_info.load_doc_from_older_meta(self.meta_info)
 
-            self.meta_info = new_meta_info  # Englishmeta_infoEnglishnewEnglish
+            self.meta_info = new_meta_info
             self.meta_info.in_generation_process = (
-                True  # Englishin_generation_processEnglishTrue，EnglishGenerating document English
+                True
             )
 
-        # English
         check_task_available_func = partial(
             need_to_generate, ignore_list=self.setting.project.ignore_list
         )
@@ -318,19 +220,17 @@ class Runner:
         )
         logger.info("Doc has been forwarded to the latest version")
 
-        self.markdown_refresh()
+        self.markdown_manager.markdown_refresh()
         delete_fake_files()
 
         logger.info("Starting to git-add DocMetaInfo and newly generated Docs")
         time.sleep(1)
 
-        # EnglishrunEnglishMarkdownEnglish（English）English
         git_add_result = self.change_detector.add_unstaged_files()
 
         if len(git_add_result) > 0:
             logger.info(f"Added {[file for file in git_add_result]} to the staging area.")
 
-        # self.git_commit(f"Update documentation for {file_handler.file_path}") # English
 
     def add_new_item(self, file_handler, json_data):
         """
@@ -344,7 +244,6 @@ class Runner:
             None
         """
         file_dict = {}
-        # English，English
         for (
             structure_type,
             name,
@@ -359,19 +258,15 @@ class Runner:
             response_message = self.chat_engine.generate_doc(code_info, file_handler)
             md_content = response_message.content
             code_info["md_content"] = md_content
-            # Englishfile_dictEnglish
             file_dict[name] = code_info
 
         json_data[file_handler.file_path] = file_dict
-        # EnglishjsonEnglish
         with open(self.project_manager.project_hierarchy, "w", encoding="utf-8") as f:
             json.dump(json_data, f, indent=4, ensure_ascii=False)
         logger.info(
             f"The structural information of the newly added file {file_handler.file_path} has been written into a JSON file."
         )
-        # EnglishjsonEnglishmarkdownEnglish
         markdown = file_handler.convert_to_markdown_file(file_path=file_handler.file_path)
-        # EnglishmarkdownEnglish.mdEnglish
         file_handler.write_file(
             os.path.join(
                 self.project_manager.repo_path,
@@ -380,7 +275,7 @@ class Runner:
             ),
             markdown,
         )
-        logger.info(f"English {file_handler.file_path} EnglishMarkdownEnglish。")
+        logger.info(f"Generated Markdown for {file_handler.file_path}")
 
     def process_file_changes(self, repo_path, file_path, is_new_file):
         """
@@ -396,8 +291,7 @@ class Runner:
             None
         """
 
-        file_handler = FileHandler(repo_path=repo_path, file_path=file_path)  # English
-        # EnglishpyEnglish
+        file_handler = FileHandler(repo_path=repo_path, file_path=file_path)
         source_code = file_handler.read_file()
         changed_lines = self.change_detector.parse_diffs(
             self.change_detector.get_file_diff(file_path, is_new_file)
@@ -405,27 +299,21 @@ class Runner:
         changes_in_pyfile = self.change_detector.identify_changes_in_structure(
             changed_lines, file_handler.get_functions_and_classes(source_code)
         )
-        logger.info(f"English：\n{changes_in_pyfile}")
+        logger.info(f"Changes identified:\n{changes_in_pyfile}")
 
-        # Englishproject_hierarchy.jsonEnglish.pyEnglish
         with open(self.project_manager.project_hierarchy, "r", encoding="utf-8") as f:
             json_data = json.load(f)
 
-        # English
         if file_handler.file_path in json_data:
-            # EnglishjsonEnglish
             json_data[file_handler.file_path] = self.update_existing_item(
                 json_data[file_handler.file_path], file_handler, changes_in_pyfile
             )
-            # EnglishfileEnglishjsonEnglish
             with open(self.project_manager.project_hierarchy, "w", encoding="utf-8") as f:
                 json.dump(json_data, f, indent=4, ensure_ascii=False)
 
-            logger.info(f"English{file_handler.file_path}EnglishjsonEnglish。")
+            logger.info(f"Generated JSON for {file_handler.file_path}")
 
-            # EnglishjsonEnglishmarkdownEnglish
             markdown = file_handler.convert_to_markdown_file(file_path=file_handler.file_path)
-            # EnglishmarkdownEnglish.mdEnglish
             file_handler.write_file(
                 os.path.join(
                     self.setting.project.markdown_docs_name,
@@ -433,19 +321,16 @@ class Runner:
                 ),
                 markdown,
             )
-            logger.info(f"English{file_handler.file_path}EnglishMarkdownEnglish。")
+            logger.info(f"Generated Markdown for {file_handler.file_path}")
 
-        # English，English
         else:
             self.add_new_item(file_handler, json_data)
 
-        # EnglishrunEnglishMarkdownEnglish（English）English
         git_add_result = self.change_detector.add_unstaged_files()
 
         if len(git_add_result) > 0:
-            logger.info(f"English {[file for file in git_add_result]} English")
+            logger.info(f"Staged files: {[file for file in git_add_result]}")
 
-        # self.git_commit(f"Update documentation for {file_handler.file_path}") # English
 
     def update_existing_item(self, file_dict, file_handler, changes_in_pyfile):
         """
@@ -461,41 +346,34 @@ class Runner:
         """
         new_obj, del_obj = self.get_new_objects(file_handler)
 
-        # English
-        for obj_name in del_obj:  # English
+        for obj_name in del_obj:
             if obj_name in file_dict:
                 del file_dict[obj_name]
-                logger.info(f"English {obj_name} English。")
+                logger.info(f"Removed {obj_name}.")
 
         referencer_list = []
 
-        # English，English， English
         current_objects = file_handler.generate_file_structure(file_handler.file_path)
 
         current_info_dict = {obj["name"]: obj for obj in current_objects.values()}
 
-        # English，English\English
         for current_obj_name, current_obj_info in current_info_dict.items():
             if current_obj_name in file_dict:
-                # English，English
                 file_dict[current_obj_name]["type"] = current_obj_info["type"]
                 file_dict[current_obj_name]["code_start_line"] = current_obj_info["code_start_line"]
                 file_dict[current_obj_name]["code_end_line"] = current_obj_info["code_end_line"]
                 file_dict[current_obj_name]["parent"] = current_obj_info["parent"]
                 file_dict[current_obj_name]["name_column"] = current_obj_info["name_column"]
             else:
-                # English，English
                 file_dict[current_obj_name] = current_obj_info
 
-        # English：English
         for obj_name, _ in changes_in_pyfile["added"]:
             for (
                 current_object
             ) in (
                 current_objects.values()
-            ):  # Englishnew_objectsEnglishfind_all_referencerEnglish。Englishchanges_in_pyfile['added']English，English
-                if obj_name == current_object["name"]:  # EnglishaddedEnglishnew_objectsEnglish
-                    # English
+            ):
+                if obj_name == current_object["name"]:
                     referencer_obj = {
                         "obj_name": obj_name,
                         "obj_referencer_list": self.project_manager.find_all_referencer(
@@ -505,14 +383,13 @@ class Runner:
                             column_number=current_object["name_column"],
                         ),
                     }
-                    referencer_list.append(referencer_obj)  # English，English
+                    referencer_list.append(referencer_obj)
 
         with ThreadPoolExecutor(max_workers=5) as executor:
-            # English
             futures = []
-            for changed_obj in changes_in_pyfile["added"]:  # English
+            for changed_obj in changes_in_pyfile["added"]:
                 for ref_obj in referencer_list:
-                    if changed_obj[0] == ref_obj["obj_name"]:  # Englishreferencer_listEnglish！
+                    if changed_obj[0] == ref_obj["obj_name"]:
                         future = executor.submit(
                             self.update_object,
                             file_dict,
@@ -521,14 +398,13 @@ class Runner:
                             ref_obj["obj_referencer_list"],
                         )
                         print(
-                            f"English {Fore.CYAN}{file_handler.file_path}{Style.RESET_ALL}English{Fore.CYAN}{changed_obj[0]}{Style.RESET_ALL}English."
+                            f"Updated {Fore.CYAN}{file_handler.file_path}{Style.RESET_ALL}: {Fore.CYAN}{changed_obj[0]}{Style.RESET_ALL}"
                         )
                         futures.append(future)
 
             for future in futures:
                 future.result()
 
-        # EnglishfileEnglish
         return file_dict
 
     def update_object(self, file_dict, file_handler, obj_name, obj_referencer_list):
@@ -582,4 +458,4 @@ if __name__ == "__main__":
 
     runner.run()
 
-    logger.info("English。")
+    logger.info("Task completed.")

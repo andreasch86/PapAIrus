@@ -1,4 +1,3 @@
-"""EnglishdocEnglish，English"""
 
 from __future__ import annotations
 
@@ -29,21 +28,20 @@ from papairus.utils.meta_info_utils import latest_verison_substring
 
 @unique
 class EdgeType(Enum):
-    reference_edge = auto()  # EnglishobjEnglishobj
-    subfile_edge = auto()  # English English/English English
-    file_item_edge = auto()  # English obj English
+    reference_edge = auto()
+    subfile_edge = auto()
+    file_item_edge = auto()
 
 
 @unique
 class DocItemType(Enum):
-    # English（English）
-    _repo = auto()  # English，Englishreadme
+    _repo = auto()
     _dir = auto()
     _file = auto()
     _class = auto()
     _class_function = auto()
-    _function = auto()  # Englishfunction
-    _sub_function = auto()  # functionEnglishsubfunction
+    _function = auto()
+    _sub_function = auto()
     _global_var = auto()
 
     def to_str(self):
@@ -80,15 +78,14 @@ class DocItemType(Enum):
 
 @unique
 class DocItemStatus(Enum):
-    doc_up_to_date = auto()  # English
-    doc_has_not_been_generated = auto()  # English，English
-    code_changed = auto()  # English，English
-    add_new_referencer = auto()  # English
-    referencer_not_exist = auto()  # EnglishobjEnglish，English
+    doc_up_to_date = auto()
+    doc_has_not_been_generated = auto()
+    code_changed = auto()
+    add_new_referencer = auto()
+    referencer_not_exist = auto()
 
 
 def need_to_generate(doc_item: DocItem, ignore_list: List[str] = []) -> bool:
-    """EnglishitemEnglish，English。EnglishblacklistEnglish"""
     if doc_item.item_status == DocItemStatus.doc_up_to_date:
         return False
     rel_file_path = doc_item.get_full_name()
@@ -96,12 +93,11 @@ def need_to_generate(doc_item: DocItem, ignore_list: List[str] = []) -> bool:
         DocItemType._file,
         DocItemType._dir,
         DocItemType._repo,
-    ]:  # EnglishfileEnglishdoc
+    ]:
         return False
     doc_item = doc_item.father
     while doc_item:
         if doc_item.item_type == DocItemType._file:
-            # English，English，English
             if any(rel_file_path.startswith(ignore_item) for ignore_item in ignore_list):
                 return False
             else:
@@ -115,29 +111,29 @@ class DocItem:
     item_type: DocItemType = DocItemType._class_function
     item_status: DocItemStatus = DocItemStatus.doc_has_not_been_generated
 
-    obj_name: str = ""  # English
+    obj_name: str = ""
     code_start_line: int = -1
     code_end_line: int = -1
-    md_content: List[str] = field(default_factory=list)  # Englishdoc
-    content: Dict[Any, Any] = field(default_factory=dict)  # English
+    md_content: List[str] = field(default_factory=list)
+    content: Dict[Any, Any] = field(default_factory=dict)
 
-    children: Dict[str, DocItem] = field(default_factory=dict)  # English
+    children: Dict[str, DocItem] = field(default_factory=dict)
     father: Any[DocItem] = None
 
     depth: int = 0
-    tree_path: List[DocItem] = field(default_factory=list)  # English，EnglishrootEnglish
+    tree_path: List[DocItem] = field(default_factory=list)
     max_reference_ansce: Any[DocItem] = None
 
-    reference_who: List[DocItem] = field(default_factory=list)  # English
-    who_reference_me: List[DocItem] = field(default_factory=list)  # English
+    reference_who: List[DocItem] = field(default_factory=list)
+    who_reference_me: List[DocItem] = field(default_factory=list)
     special_reference_type: List[bool] = field(default_factory=list)
 
-    reference_who_name_list: List[str] = field(default_factory=list)  # English，English
-    who_reference_me_name_list: List[str] = field(default_factory=list)  # English，English
+    reference_who_name_list: List[str] = field(default_factory=list)
+    who_reference_me_name_list: List[str] = field(default_factory=list)
 
     has_task: bool = False
 
-    multithread_task_id: int = -1  # Englishtask_id
+    multithread_task_id: int = -1
 
     @staticmethod
     def has_ans_relation(now_a: DocItem, now_b: DocItem):
@@ -157,7 +153,6 @@ class DocItem:
         return None
 
     def get_travel_list(self):
-        """English，English"""
         now_list = [self]
         for _, child in self.children.items():
             now_list = now_list + child.get_travel_list()
@@ -199,10 +194,8 @@ class DocItem:
         return full_name.split(".py")[0] + ".py"
 
     def get_full_name(self, strict=False):
-        """EnglishobjEnglish
-
+        """
         Returns:
-            str: EnglishobjEnglish，English
         """
         if self.father == None:
             return self.obj_name
@@ -225,7 +218,6 @@ class DocItem:
 
     def find(self, recursive_file_path: list) -> Optional[DocItem]:
         """
-        EnglishrepoEnglishpath_listEnglish, EnglishFalse
 
         Args:
             recursive_file_path (list): The list of file paths to search for.
@@ -258,7 +250,6 @@ class DocItem:
         diff_status=False,
         ignore_list: List[str] = [],
     ):
-        """EnglishrepoEnglish"""
 
         def print_indent(indent=0):
             if indent == 0:
@@ -294,7 +285,6 @@ class DocItem:
 def find_all_referencer(
     repo_path, variable_name, file_path, line_number, column_number, in_file_only=False
 ):
-    """English"""
     abs_path = os.path.join(repo_path, file_path)
     try:
         lines = Path(abs_path).read_text().splitlines(True)
@@ -319,7 +309,6 @@ def find_all_referencer(
             references = script.get_references(line=line_number, column=safe_column, scope="file")
         else:
             references = script.get_references(line=line_number, column=safe_column)
-        # English variable_name English，English
         variable_references = [ref for ref in references if ref.name == variable_name]
         # if variable_name == "need_to_generate":
         #     import pdb; pdb.set_trace()
@@ -329,7 +318,6 @@ def find_all_referencer(
             if not (ref.line == line_number and ref.column == column_number)
         ]
     except Exception as e:
-        # English
         logger.error(f"Error occurred: {e}")
         logger.error(
             f"Parameters: variable_name={variable_name}, file_path={file_path}, line_number={line_number}, column_number={column_number}"
@@ -340,10 +328,10 @@ def find_all_referencer(
 @dataclass
 class MetaInfo:
     repo_path: Path = ""  # type: ignore
-    document_version: str = ""  # English，""English，Englishcommit hash
+    document_version: str = ""
     target_repo_hierarchical_tree: "DocItem" = field(
         default_factory=lambda: DocItem()
-    )  # EnglishrepoEnglish
+    )
     white_list: Any[List] = None
 
     fake_file_reflection: Dict[str, str] = field(default_factory=dict)
@@ -356,7 +344,6 @@ class MetaInfo:
 
     @staticmethod
     def init_meta_info(file_path_reflections, jump_files) -> MetaInfo:
-        """EnglishpathEnglishmetainfo"""
 
         setting = SettingsManager.get_setting()
 
@@ -372,7 +359,6 @@ class MetaInfo:
 
     @staticmethod
     def from_checkpoint_path(checkpoint_dir_path: Path) -> MetaInfo:
-        """Englishmetainfo dirEnglishmetainfo"""
         setting = SettingsManager.get_setting()
 
         project_hierarchy_json_path = checkpoint_dir_path / "project_hierarchy.json"
@@ -403,19 +389,15 @@ class MetaInfo:
             flash_reference_relation (bool, optional): Whether to include flash reference relation in the saved MetaInfo. Defaults to False.
         """
         with self.checkpoint_lock:
-            # English target_dir_path English Path English
             target_dir = Path(target_dir_path)
             logger.debug(f"Checkpointing MetaInfo to directory: {target_dir}")
 
-            # English
             print(f"{Fore.GREEN}MetaInfo is Refreshed and Saved{Style.RESET_ALL}")
 
-            # English（English）
             if not target_dir.exists():
                 target_dir.mkdir(parents=True, exist_ok=True)
                 logger.debug(f"Created directory: {target_dir}")
 
-            # English project_hierarchy.json English
             now_hierarchy_json = self.to_hierarchy_json(
                 flash_reference_relation=flash_reference_relation
             )
@@ -427,7 +409,6 @@ class MetaInfo:
             except IOError as e:
                 logger.error(f"Failed to save hierarchy JSON to {hierarchy_file}: {e}")
 
-            # English meta-info.json English
             meta_info_file = target_dir / "meta-info.json"
             meta = {
                 "doc_version": self.document_version,
@@ -444,7 +425,6 @@ class MetaInfo:
                 logger.error(f"Failed to save meta-info JSON to {meta_info_file}: {e}")
 
     def print_task_list(self, task_dict: Dict[Task]):
-        """English"""
         task_table = PrettyTable(["task_id", "Doc Generation Reason", "Path", "dependency"])
         for task_id, task_info in task_dict.items():
             remain_str = "None"
@@ -464,7 +444,6 @@ class MetaInfo:
         print(task_table)
 
     def get_all_files(self) -> List[DocItem]:
-        """EnglishfileEnglish"""
         files = []
 
         def walk_tree(now_node):
@@ -477,8 +456,6 @@ class MetaInfo:
         return files
 
     def find_obj_with_lineno(self, file_node: DocItem, start_line_num) -> DocItem:
-        """EnglishDocItem._file，English，English
-        EnglishobjEnglish，English"""
         now_node = file_node
         # if
         assert now_node != None
@@ -498,23 +475,17 @@ class MetaInfo:
         return now_node
 
     def parse_reference(self):
-        """English"""
         file_nodes = self.get_all_files()
 
         white_list_file_names, white_list_obj_names = (
             [],
             [],
-        )  # English，English
+        )
         if self.white_list != None:
             white_list_file_names = [cont["file_path"] for cont in self.white_list]
             white_list_obj_names = [cont["id_text"] for cont in self.white_list]
 
         for file_node in tqdm(file_nodes, desc="parsing bidirectional reference"):
-            """English，EnglishobjEnglish。
-            1. Englishjump-files，English
-            2. Englishjump-files, English
-            3. Englishfake-file,English
-            """
             assert not file_node.get_full_name().endswith(latest_verison_substring)
 
             ref_count = 0
@@ -523,15 +494,14 @@ class MetaInfo:
 
             if white_list_file_names != [] and (
                 file_node.get_file_name() not in white_list_file_names
-            ):  # English，EnglishparseEnglish
+            ):
                 continue
 
             def walk_file(now_obj: DocItem):
-                """English"""
                 nonlocal ref_count, white_list_file_names
                 in_file_only = False
                 if white_list_obj_names != [] and (now_obj.obj_name not in white_list_obj_names):
-                    in_file_only = True  # English，English，EnglishobjEnglishparse，English
+                    in_file_only = True
 
                 reference_list = find_all_referencer(
                     repo_path=self.repo_path,
@@ -541,16 +511,14 @@ class MetaInfo:
                     column_number=now_obj.content["name_column"],
                     in_file_only=in_file_only,
                 )
-                for referencer_pos in reference_list:  # English
+                for referencer_pos in reference_list:
                     referencer_file_ral_path = referencer_pos[0]
                     if referencer_file_ral_path in self.fake_file_reflection.values():
-                        """Englishunstaged files，English"""
                         print(
                             f"{Fore.LIGHTBLUE_EX}[Reference From Unstaged Version, skip]{Style.RESET_ALL} {referencer_file_ral_path} -> {now_obj.get_full_name()}"
                         )
                         continue
                     elif referencer_file_ral_path in self.jump_files:
-                        """Englishuntracked files，English"""
                         print(
                             f"{Fore.LIGHTBLUE_EX}[Reference From Unstracked Version, skip]{Style.RESET_ALL} {referencer_file_ral_path} -> {now_obj.get_full_name()}"
                         )
@@ -589,7 +557,6 @@ class MetaInfo:
                     # if now_obj.get_full_name() == "papairus/runner.py/Runner/run":
                     #     import pdb; pdb.set_trace()
                     if DocItem.has_ans_relation(now_obj, referencer_node) == None:
-                        # English
                         if now_obj not in referencer_node.reference_who:
                             special_reference_type = (
                                 referencer_node.item_type
@@ -611,7 +578,6 @@ class MetaInfo:
             # logger.info(f"find {ref_count} refer-relation in {file_node.get_full_name()}")
 
     def get_task_manager(self, now_node: DocItem, task_available_func) -> TaskManager:
-        """English，English"""
         doc_items = now_node.get_travel_list()
         if self.white_list != None:
 
@@ -626,7 +592,7 @@ class MetaInfo:
 
             doc_items = list(filter(in_white_list, doc_items))
         doc_items = list(filter(task_available_func, doc_items))
-        doc_items = sorted(doc_items, key=lambda x: x.depth)  # English
+        doc_items = sorted(doc_items, key=lambda x: x.depth)
         deal_items = []
         task_manager = TaskManager()
         bar = tqdm(total=len(doc_items), desc="parsing topology task-list")
@@ -634,15 +600,9 @@ class MetaInfo:
             min_break_level = 1e7
             target_item = None
             for item in doc_items:
-                """English,English(English)。
-                English
-                Englishfunc-defEnglishparam defEnglish
-                English，EnglishbindEnglish，English：
-                ChatDev/WareHouse/Gomoku_HumanAgentInteraction_20230920135038/main.pyEnglish: on-click、show-winner、restart
-                """
                 best_break_level = 0
                 second_best_break_level = 0
-                for _, child in item.children.items():  # English
+                for _, child in item.children.items():
                     if task_available_func(child) and (child not in deal_items):
                         best_break_level += 1
                 for referenced, special in zip(item.reference_who, item.special_reference_type):
@@ -675,7 +635,7 @@ class MetaInfo:
             for referenced_item in target_item.reference_who:
                 if referenced_item.multithread_task_id in task_manager.task_dict.keys():
                     item_denp_task_ids.append(referenced_item.multithread_task_id)
-            item_denp_task_ids = list(set(item_denp_task_ids))  # English
+            item_denp_task_ids = list(set(item_denp_task_ids))
             if task_available_func == None or task_available_func(target_item):
                 task_id = task_manager.add_task(
                     dependency_task_id=item_denp_task_ids, extra=target_item
@@ -688,7 +648,6 @@ class MetaInfo:
         return task_manager
 
     def get_topology(self, task_available_func) -> TaskManager:
-        """EnglishrepoEnglish"""
         self.parse_reference()
         task_manager = self.get_task_manager(
             self.target_repo_hierarchical_tree, task_available_func=task_available_func
@@ -696,7 +655,6 @@ class MetaInfo:
         return task_manager
 
     def _map(self, deal_func: Callable):
-        """English"""
 
         def travel(now_item: DocItem):
             deal_func(now_item)
@@ -706,28 +664,17 @@ class MetaInfo:
         travel(self.target_repo_hierarchical_tree)
 
     def load_doc_from_older_meta(self, older_meta: MetaInfo):
-        """older_metaEnglish、EnglishdocEnglishmeta info"""
         logger.info("merge doc from an older version of metainfo")
-        root_item = self.target_repo_hierarchical_tree  # English
+        root_item = self.target_repo_hierarchical_tree
         deleted_items = []
 
         def find_item(now_item: DocItem) -> Optional[DocItem]:
-            """
-            Find an item in the new version of meta based on its original item.
-
-            Args:
-                now_item (DocItem): The original item to be found in the new version of meta.
-
-            Returns:
-                Optional[DocItem]: The corresponding item in the new version of meta if found, otherwise None.
-            """
             nonlocal root_item
             if now_item.father == None:  # The root node can always be found
                 return root_item
             father_find_result = find_item(now_item.father)
             if not father_find_result:
                 return None
-            # English：English now_item.obj_nameEnglish，English
             real_name = None
             for child_real_name, temp_item in now_item.father.children.items():
                 if temp_item == now_item:
@@ -741,11 +688,11 @@ class MetaInfo:
                 return result_item
             return None
 
-        def travel(now_older_item: DocItem):  # English
+        def travel(now_older_item: DocItem):
             # if now_older_item.get_full_name() == "autogen/_pydantic.py/type2schema":
             #     import pdb; pdb.set_trace()
             result_item = find_item(now_older_item)
-            if not result_item:  # Englishitem，English
+            if not result_item:
                 deleted_items.append(
                     [now_older_item.get_full_name(), now_older_item.item_type.name]
                 )
@@ -758,7 +705,7 @@ class MetaInfo:
                 assert "code_content" in result_item.content.keys()
                 if (
                     now_older_item.content["code_content"] != result_item.content["code_content"]
-                ):  # English
+                ):
                     result_item.item_status = DocItemStatus.code_changed
 
             for _, child in now_older_item.children.items():
@@ -766,14 +713,12 @@ class MetaInfo:
 
         travel(older_meta.target_repo_hierarchical_tree)
 
-        """English，parseEnglish，English"""
         self.parse_reference()
 
         def travel2(now_older_item: DocItem):
             result_item = find_item(now_older_item)
-            if not result_item:  # Englishitem，English
+            if not result_item:
                 return
-            """result_itemEnglish"""
             new_reference_names = [
                 name.get_full_name(strict=True) for name in result_item.who_reference_me
             ]
@@ -785,7 +730,7 @@ class MetaInfo:
             ):
                 if set(new_reference_names) <= set(
                     old_reference_names
-                ):  # EnglishreferencerEnglishreferencer
+                ):
                     result_item.item_status = DocItemStatus.referencer_not_exist
                 else:
                     result_item.item_status = DocItemStatus.add_new_referencer
@@ -798,7 +743,6 @@ class MetaInfo:
 
     @staticmethod
     def from_project_hierarchy_path(repo_path: str) -> MetaInfo:
-        """project_hierarchy_jsonEnglish，EnglishkeyEnglish, English"""
         project_hierarchy_json_path = os.path.join(repo_path, "project_hierarchy.json")
         logger.info(f"parsing from {project_hierarchy_json_path}")
         if not os.path.exists(project_hierarchy_json_path):
@@ -859,7 +803,7 @@ class MetaInfo:
 
         target_meta_info = MetaInfo(
             # repo_path=repo_path,
-            target_repo_hierarchical_tree=DocItem(  # English
+            target_repo_hierarchical_tree=DocItem(
                 item_type=DocItemType._repo,
                 obj_name="full_repo",
             )
@@ -868,7 +812,6 @@ class MetaInfo:
         for file_name, file_content in tqdm(
             project_hierarchy_json.items(), desc="parsing parent relationship"
         ):
-            # Englishparse file archi
             if not os.path.exists(os.path.join(setting.project.target_repo, file_name)):
                 logger.info(f"deleted content: {file_name}")
                 continue
@@ -896,16 +839,9 @@ class MetaInfo:
                 )
                 now_structure.children[recursive_file_path[pos]].father = now_structure
 
-            # Englishparse fileEnglish
             assert type(file_content) == list
             file_item = target_meta_info.target_repo_hierarchical_tree.find(recursive_file_path)
             assert file_item.item_type == DocItemType._file
-            """English：
-            1.EnglishparseEnglish，English
-            2.English，EnglishcodeEnglish，English
-            EnglishO(n^2)
-            3.EnglishtypeEnglish
-            """
 
             obj_item_list: List[DocItem] = []
             for value in file_content:
@@ -926,7 +862,6 @@ class MetaInfo:
                     obj_doc_item.who_reference_me_name_list = value["who_reference_me"]
                 obj_item_list.append(obj_doc_item)
 
-            # English
             for item in obj_item_list:
                 potential_father = None
                 for other_item in obj_item_list:
@@ -956,7 +891,6 @@ class MetaInfo:
                 item.father = potential_father
                 child_name = item.obj_name
                 if child_name in potential_father.children.keys():
-                    # English，English xxx_iEnglish
                     now_name_id = 0
                     while (child_name + f"_{now_name_id}") in potential_father.children.keys():
                         now_name_id += 1

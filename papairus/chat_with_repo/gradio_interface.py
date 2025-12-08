@@ -15,24 +15,24 @@ class GradioInterface:
         self.cssa = """
                 <style>
                         .outer-box {
-                            border: 1px solid #333; /* English */
-                            border-radius: 10px; /* English */
-                            padding: 10px; /* English */
+                            border: 1px solid #333;
+                            border-radius: 10px;
+                            padding: 10px;
                         }
 
                         .title {
-                            margin-bottom: 10px; /* English */
+                            margin-bottom: 10px;
                         }
 
                         .inner-box {
-                            border: 1px solid #555; /* English */
-                            border-radius: 5px; /* English */
-                            padding: 10px; /* English */
+                            border: 1px solid #555;
+                            border-radius: 5px;
+                            padding: 10px;
                         }
 
                         .content {
-                            white-space: pre-wrap; /* English */
-                            font-size: 16px; /* English */
+                            white-space: pre-wrap;
+                            font-size: 16px;
                             height: 405px;
                             overflow: auto;
                         }
@@ -48,7 +48,6 @@ class GradioInterface:
         self.setup_gradio_interface()
 
     def wrapper_respond(self, msg_input, system_input):  # pragma: no cover
-        # English respond English
         msg, output1, output2, output3, code, codex = self.respond(msg_input, system_input)
         output1 = markdown.markdown(str(output1))
         output2 = markdown.markdown(str(output2))
@@ -211,7 +210,6 @@ class GradioInterface:
             self.launch_handle.close()
 
 
-# English
 if __name__ == "__main__":  # pragma: no cover - manual launch helper
 
     def respond_function(msg, system):

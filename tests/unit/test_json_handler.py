@@ -30,6 +30,7 @@ def test_extract_data_collects_md_and_metadata(tmp_path):
     assert md_contents == ["md body"]
     assert extracted == [
         {
+                "file_path": "file.py",
             "type": "function",
             "name": "do_work",
             "code_start_line": 1,
