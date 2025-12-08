@@ -3,21 +3,14 @@ from types import SimpleNamespace
 import pytest
 import requests
 
-from papairus.llm_provider import VertexGeminiLLM, build_embedding_model, build_llm
+from papairus.llm.backends.gemini import GeminiBackend
+from papairus.llm_provider import build_embedding_model, build_llm
 from papairus.settings import ChatCompletionSettings
 
 
-def test_build_llm_uses_ollama(monkeypatch):
-    captured_kwargs = {}
-
-    class FakeOllama:
-        def __init__(self, **kwargs):
-            captured_kwargs.update(kwargs)
-
-    monkeypatch.setattr("papairus.llm_provider.Ollama", FakeOllama)
-
+def test_build_llm_uses_local_gemma():
     settings = ChatCompletionSettings(
-        model="gemma-local",
+        model="local-gemma",
         request_timeout=45,
         temperature=0.7,
         gemini_api_key=None,
@@ -27,13 +20,12 @@ def test_build_llm_uses_ollama(monkeypatch):
 
     llm = build_llm(settings)
 
-    assert isinstance(llm, FakeOllama)
-    assert captured_kwargs == {
-        "model": "gemma2:2b",
-        "request_timeout": 45,
-        "temperature": 0.7,
-        "base_url": "http://ollama:11434",
-    }
+    from papairus.llm.backends.local_gemma import LocalGemmaBackend
+
+    assert isinstance(llm, LocalGemmaBackend)
+    assert llm.model == "gemma2:2b"
+    assert llm.base_url == "http://ollama:11434"
+    assert llm.temperature == 0.7
 
 
 def test_build_embedding_model_for_gemma(monkeypatch):
@@ -46,7 +38,7 @@ def test_build_embedding_model_for_gemma(monkeypatch):
     monkeypatch.setattr("papairus.llm_provider.OllamaEmbedding", FakeOllamaEmbedding)
 
     settings = ChatCompletionSettings(
-        model="gemma-local",
+        model="local-gemma",
         gemini_api_key=None,
         ollama_base_url="http://ollama:11434",
         ollama_embedding_model="gemma-embed:latest",
@@ -64,7 +56,7 @@ def test_build_embedding_model_for_gemma(monkeypatch):
 def test_build_embedding_model_for_gemma_missing_dep(monkeypatch):
     monkeypatch.setattr("papairus.llm_provider.OllamaEmbedding", None)
 
-    settings = ChatCompletionSettings(model="gemma-local")
+    settings = ChatCompletionSettings(model="local-gemma")
 
     with pytest.raises(ImportError) as excinfo:
         build_embedding_model(settings)
@@ -134,7 +126,7 @@ def test_build_embedding_model_rejects_unknown_model():
         build_embedding_model(settings)
 
 
-def test_vertex_gemini_llm_returns_text_and_usage(monkeypatch):
+def test_gemini_backend_returns_text_and_usage(monkeypatch):
     def fake_json():
         return {
             "candidates": [
@@ -166,7 +158,7 @@ def test_vertex_gemini_llm_returns_text_and_usage(monkeypatch):
 
     monkeypatch.setattr("requests.post", fake_post)
 
-    llm = VertexGeminiLLM(
+    llm = GeminiBackend(
         api_key="dummy",
         base_url="https://aiplatform.googleapis.com/v1",
         model="gemini-2.5-flash",
@@ -182,7 +174,7 @@ def test_vertex_gemini_llm_returns_text_and_usage(monkeypatch):
     assert result.raw.usage.total_tokens == 3
 
 
-def test_vertex_gemini_llm_raises_clear_error_on_404(monkeypatch):
+def test_gemini_backend_raises_clear_error_on_404(monkeypatch):
     class FakeResponse:
         def __init__(self):
             self.status_code = 404
@@ -200,7 +192,7 @@ def test_vertex_gemini_llm_raises_clear_error_on_404(monkeypatch):
 
     monkeypatch.setattr("requests.post", fake_post)
 
-    llm = VertexGeminiLLM(
+    llm = GeminiBackend(
         api_key="dummy",
         base_url="https://aiplatform.googleapis.com/v1",
         model="gemini-3-flash",
@@ -214,7 +206,7 @@ def test_vertex_gemini_llm_raises_clear_error_on_404(monkeypatch):
     assert "Gemini model not found" in str(excinfo.value)
 
 
-def test_vertex_gemini_llm_raises_when_no_candidates(monkeypatch):
+def test_gemini_backend_raises_when_no_candidates(monkeypatch):
     class FakeResponse:
         status_code = 200
         url = "https://example.com/generate"
@@ -227,7 +219,7 @@ def test_vertex_gemini_llm_raises_when_no_candidates(monkeypatch):
 
     monkeypatch.setattr("requests.post", lambda *_args, **_kwargs: FakeResponse())
 
-    llm = VertexGeminiLLM(
+    llm = GeminiBackend(
         api_key="dummy",
         base_url="https://aiplatform.googleapis.com/v1",
         model="gemini-2.5-flash",

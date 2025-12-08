@@ -1,5 +1,5 @@
 version = 1
-revision = 3
+revision = 2
 requires-python = ">=3.11, <4.0"
 resolution-markers = [
     "python_full_version >= '3.14'",
@@ -2534,22 +2534,22 @@ dependencies = [
     { name = "click" },
     { name = "colorama" },
     { name = "gitpython" },
-    { name = "jedi" },
-    { name = "llama-index-llms-gemini" },
-    { name = "llama-index-llms-ollama" },
-    { name = "loguru" },
-    { name = "prettytable" },
-    { name = "pydantic-settings" },
-    { name = "python-iso639" },
-]
-
-[package.optional-dependencies]
-chat-with-repo = [
     { name = "gradio" },
+    { name = "jedi" },
+    { name = "llama-index-core" },
     { name = "llama-index-embeddings-gemini" },
     { name = "llama-index-embeddings-ollama" },
+    { name = "llama-index-llms-gemini" },
+    { name = "llama-index-llms-ollama" },
     { name = "llama-index-vector-stores-chroma" },
+    { name = "loguru" },
     { name = "markdown" },
+    { name = "prettytable" },
+    { name = "pydantic" },
+    { name = "pydantic-settings" },
+    { name = "pytest-cov" },
+    { name = "python-iso639" },
+    { name = "requests" },
 ]
 
 [package.dev-dependencies]
@@ -2570,18 +2570,22 @@ requires-dist = [
     { name = "click", specifier = ">=8.1.7" },
     { name = "colorama", specifier = ">=0.4.6" },
     { name = "gitpython", specifier = ">=3.1.41" },
-    { name = "gradio", marker = "extra == 'chat-with-repo'", specifier = ">=5.6.0" },
+    { name = "gradio", specifier = ">=5.6.0" },
     { name = "jedi", specifier = ">=0.19.1" },
-    { name = "llama-index-embeddings-gemini", marker = "extra == 'chat-with-repo'", specifier = ">=0.2.5" },
-    { name = "llama-index-embeddings-ollama", marker = "extra == 'chat-with-repo'", specifier = ">=0.3.0" },
+    { name = "llama-index-core", specifier = ">=0.11.15" },
+    { name = "llama-index-embeddings-gemini", specifier = ">=0.2.5" },
+    { name = "llama-index-embeddings-ollama", specifier = ">=0.3.0" },
     { name = "llama-index-llms-gemini", specifier = ">=0.3.6" },
     { name = "llama-index-llms-ollama", specifier = ">=0.3.1" },
-    { name = "llama-index-vector-stores-chroma", marker = "extra == 'chat-with-repo'", specifier = ">=0.3.0" },
+    { name = "llama-index-vector-stores-chroma", specifier = ">=0.3.0" },
     { name = "loguru", specifier = ">=0.7.2" },
-    { name = "markdown", marker = "extra == 'chat-with-repo'", specifier = ">=3.7" },
+    { name = "markdown", specifier = ">=3.7" },
     { name = "prettytable", specifier = ">=3.9.0" },
+    { name = "pydantic", specifier = ">=2.6.0" },
     { name = "pydantic-settings", specifier = ">=2.2.1" },
+    { name = "pytest-cov", specifier = ">=6.0.0" },
     { name = "python-iso639", specifier = ">=2024.10.22" },
+    { name = "requests", specifier = ">=2.32.3" },
 ]
 provides-extras = ["chat-with-repo"]
 
