@@ -1,4 +1,3 @@
-import json
 import types
 
 import pytest
@@ -71,17 +70,7 @@ class DummyVectorStoreManager:
 def patch_dependencies(monkeypatch):
     dummy_llm = DummyLLM(
         complete_responses=["q1\nq2", "rag-text", "rag-ar-text"],
-        chat_responses=[
-            json.dumps(
-                {
-                    "documents": [
-                        {"content": "doc-1", "relevance_score": 10},
-                        {"content": "doc-2", "relevance_score": 20},
-                    ]
-                }
-            ),
-            "rag-ar-text",
-        ],
+        chat_responses=["rag-ar-text"],
     )
     monkeypatch.setattr(rag_module, "build_llm", lambda *_: dummy_llm)
     monkeypatch.setattr(rag_module, "build_embedding_model", lambda *_: "embed")
@@ -91,9 +80,6 @@ def patch_dependencies(monkeypatch):
         rag_module,
         "rag_ar_template",
         types.SimpleNamespace(format_messages=lambda **_: "rag-ar-prompt"),
-    )
-    monkeypatch.setattr(
-        rag_module, "relevance_ranking_chat_template", types.SimpleNamespace(format_messages=lambda **_: [])
     )
     return dummy_llm
 
@@ -128,27 +114,40 @@ def test_generate_queries_strips_formatting(monkeypatch, patch_dependencies, tmp
     assert queries == ["System: What is this repo?", "System: How does it work?"]
 
 
+def test_sanitize_generated_queries_handles_non_strings(patch_dependencies, tmp_path):
+    settings = ChatCompletionSettings(model="local-gemma")
+    assistant = rag_module.RepoAssistant(settings, tmp_path / "db.json")
+
+    cleaned = assistant._sanitize_generated_queries([None, 123, "   "])
+
+    assert cleaned == []
+
+
 def test_rerank_sorts_documents(monkeypatch, patch_dependencies, tmp_path):
     settings = ChatCompletionSettings(model="local-gemma")
     assistant = rag_module.RepoAssistant(settings, tmp_path / "db.json")
 
-    docs = ["doc-a", "doc-b"]
+    docs = ["doc about apples", "query aligned doc"]
     results = assistant.rerank("query", docs)
 
-    assert results == ["doc-2", "doc-1"]
+    assert results == ["query aligned doc", "doc about apples"]
 
 
-def test_rerank_gracefully_handles_invalid_json(monkeypatch, patch_dependencies, tmp_path):
+def test_rerank_handles_empty_query_terms(monkeypatch, patch_dependencies, tmp_path):
     settings = ChatCompletionSettings(model="local-gemma")
     assistant = rag_module.RepoAssistant(settings, tmp_path / "db.json")
 
-    # Force an invalid response payload from the LLM chat call
-    assistant.weak_model.chat_responses = [""]
-
     docs = ["doc-a", "doc-b", "doc-c"]
-    results = assistant.rerank("query", docs)
+    results = assistant.rerank("!!!", docs)
 
     assert results == docs[:5]
+
+
+def test_rerank_returns_empty_for_no_docs(patch_dependencies, tmp_path):
+    settings = ChatCompletionSettings(model="local-gemma")
+    assistant = rag_module.RepoAssistant(settings, tmp_path / "db.json")
+
+    assert assistant.rerank("query", []) == []
 
 
 def test_rag_and_rag_ar_delegate_to_llms(patch_dependencies, tmp_path):
@@ -195,6 +194,90 @@ def test_respond_skips_empty_queries_and_returns_strings(monkeypatch, patch_depe
 
     assert seen_queries == ["question", "q1"]
     assert isinstance(result[3], str)
+
+
+def test_respond_deduplicates_queries(monkeypatch, patch_dependencies, tmp_path):
+    settings = ChatCompletionSettings(model="local-gemma")
+    assistant = rag_module.RepoAssistant(settings, tmp_path / "db.json")
+
+    seen_queries: list[str] = []
+
+    monkeypatch.setattr(assistant, "generate_queries", lambda *_: ["question", "other"])
+    monkeypatch.setattr(assistant, "rag", lambda *_: "ragged")
+    monkeypatch.setattr(assistant, "rag_ar", lambda *_: "final")
+    monkeypatch.setattr(assistant, "rerank", lambda _query, docs: list(docs))
+    monkeypatch.setattr(
+        assistant.vector_store_manager,
+        "query_store",
+        lambda query: seen_queries.append(query) or [{"text": query, "metadata": {}}],
+    )
+
+    assistant.respond("question", "instruction")
+
+    assert seen_queries == ["question", "other"]
+
+
+def test_respond_flattens_markdown_variants(monkeypatch, patch_dependencies, tmp_path):
+    settings = ChatCompletionSettings(model="local-gemma")
+    assistant = rag_module.RepoAssistant(settings, tmp_path / "db.json")
+
+    class MixedTextAnalysisTool(DummyTextAnalysisTool):
+        def queryblock(self, _message):
+            return ["code-a"], [["md-list", None], ("tuple-md", ""), "string-md"]
+
+        def list_to_markdown(self, items):
+            return "|".join(map(str, items))
+
+        def nerquery(self, message):
+            return message
+
+    assistant.textanslys = MixedTextAnalysisTool(None, None)
+    assistant.rerank = lambda _query, docs: list(docs)
+    assistant.rag = lambda *_: "ragged"
+    captured_embedding: list[str] = []
+
+    def _capture_rag_ar(_prompt, _code, embedding_recall, _project):
+        captured_embedding.extend(embedding_recall)
+        return "final"
+
+    assistant.rag_ar = _capture_rag_ar
+    assistant.generate_queries = lambda *_: []
+    assistant.vector_store_manager.query_store = lambda *_: [
+        {"text": "doc-one", "metadata": {"code_content": "code-one"}}
+    ]
+
+    result = assistant.respond("question", "instruction")
+
+    assert "code-a" in result[5]
+    assert any("md-list" in item for item in captured_embedding)
+
+
+def test_respond_flattens_string_only_metadata(monkeypatch, patch_dependencies, tmp_path):
+    settings = ChatCompletionSettings(model="local-gemma")
+    assistant = rag_module.RepoAssistant(settings, tmp_path / "db.json")
+
+    class StringOnlyTool(DummyTextAnalysisTool):
+        def queryblock(self, _message):
+            return ["code-b"], ["", "only-string-md", 123]
+
+        def list_to_markdown(self, items):
+            return "|".join(map(str, items))
+
+        def nerquery(self, message):
+            return message
+
+    assistant.textanslys = StringOnlyTool(None, None)
+    assistant.rerank = lambda _query, docs: list(docs)
+    assistant.rag = lambda *_: "ragged"
+    assistant.rag_ar = lambda *_: "final"
+    assistant.generate_queries = lambda *_: []
+    assistant.vector_store_manager.query_store = lambda *_: [
+        {"text": "doc-two", "metadata": {"code_content": "code-two"}}
+    ]
+
+    result = assistant.respond("question", "instruction")
+
+    assert "code-b" in result[5]
 
 
 def test_respond_falls_back_to_message_when_no_queries(monkeypatch, patch_dependencies, tmp_path):

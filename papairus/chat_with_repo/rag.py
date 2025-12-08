@@ -1,12 +1,7 @@
-import json
+import re
 
 from papairus.chat_with_repo.json_handler import JsonFileProcessor
-from papairus.chat_with_repo.prompt import (
-    query_generation_template,
-    rag_ar_template,
-    rag_template,
-    relevance_ranking_chat_template,
-)
+from papairus.chat_with_repo.prompt import query_generation_template, rag_ar_template, rag_template
 from papairus.chat_with_repo.text_analysis_tool import TextAnalysisTool
 from papairus.chat_with_repo.vector_store_manager import VectorStoreManager
 from papairus.llm_provider import build_embedding_model, build_llm
@@ -57,31 +52,23 @@ class RepoAssistant:
         return cleaned_queries
 
     def rerank(self, query, docs):  # English
-        response = self.weak_model.chat(
-            response_format={"type": "json_object"},
-            temperature=0,
-            messages=relevance_ranking_chat_template.format_messages(query=query, docs=docs),
-        )
+        if not docs:
+            return []
 
-        content = getattr(getattr(response, "message", None), "content", None)
-        if not content:
-            logger.warning("Rerank response missing content; returning top docs without rerank.")
+        query_terms = [term for term in re.split(r"\W+", str(query).lower()) if term]
+        if not query_terms:
             return list(docs)[:5]
 
-        try:
-            parsed = json.loads(content)
-            scores = parsed.get("documents", [])
-        except (json.JSONDecodeError, TypeError, AttributeError) as exc:
-            logger.warning(
-                "Failed to parse rerank response as JSON; returning top docs without rerank.",
-                exc_info=exc,
-            )
-            return list(docs)[:5]
+        scored: list[tuple[int, int, str]] = []
+        for idx, doc in enumerate(docs):
+            text = str(doc)
+            lowered = text.lower()
+            score = sum(lowered.count(term) for term in query_terms)
+            scored.append((score, idx, text))
 
-        logger.debug(f"scores: {scores}")
-        sorted_data = sorted(scores, key=lambda x: x.get("relevance_score", 0), reverse=True)
-        top_5_contents = [doc.get("content") for doc in sorted_data[:5] if doc.get("content")]
-        return top_5_contents or list(docs)[:5]
+        scored.sort(key=lambda item: (-item[0], item[1]))
+        ranked = [doc for score, _idx, doc in scored if doc][:5]
+        return ranked or list(docs)[:5]
 
     def rag(self, query, retrieved_documents):
         rag_prompt = rag_template.format(query=query, information="\n\n".join(retrieved_documents))
@@ -144,10 +131,6 @@ class RepoAssistant:
         # Step 3: Query the VectorStoreManager for each query
         for query in prompt_queries:
             cleaned_query = query.strip()
-            if not cleaned_query:
-                logger.debug("Skipping empty query before vector search.")
-                continue
-
             logger.debug(f"Querying vector store with: {cleaned_query}")
             query_results = self.vector_store_manager.query_store(cleaned_query)
             logger.debug(f"Results for query '{query}': {query_results}")
@@ -208,9 +191,7 @@ class RepoAssistant:
 
         flattened_md: list[str] = []
         for item in md:
-            if isinstance(item, list):
-                flattened_md.extend([str(val) for val in item if val])
-            elif isinstance(item, tuple):
+            if isinstance(item, tuple):
                 flattened_md.extend([str(val) for val in item if val])
             elif isinstance(item, str):
                 if item:
@@ -223,12 +204,9 @@ class RepoAssistant:
         codex_md = self.textanslys.list_to_markdown(uni_codex)
         retrieved_documents = list(dict.fromkeys(retrieved_documents + uni_md))
 
-        # Final rerank and response generation
-        retrieved_documents = self.rerank(message, retrieved_documents[:6])
-        logger.debug(f"Final retrieved documents after rerank: {retrieved_documents}")
-
-        uni_code = self.rerank(message, list(dict.fromkeys(uni_codex + unique_code))[:6])
-        logger.debug(f"Final unique code after rerank: {uni_code}")
+        # Final response generation using top-ranked documents and code
+        retrieved_documents = retrieved_documents[:6]
+        uni_code = list(dict.fromkeys(uni_codex + unique_code))[:6]
 
         unique_code_md = self.textanslys.list_to_markdown(unique_code)
         logger.debug(f"Unique code in Markdown: {unique_code_md}")

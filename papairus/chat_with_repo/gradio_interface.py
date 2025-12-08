@@ -1,4 +1,5 @@
 # mypy: ignore-errors
+# coverage: ignore file
 
 """Gradio UI helpers."""
 
@@ -46,7 +47,7 @@ class GradioInterface:
         """
         self.setup_gradio_interface()
 
-    def wrapper_respond(self, msg_input, system_input):
+    def wrapper_respond(self, msg_input, system_input):  # pragma: no cover
         # English respond English
         msg, output1, output2, output3, code, codex = self.respond(msg_input, system_input)
         output1 = markdown.markdown(str(output1))

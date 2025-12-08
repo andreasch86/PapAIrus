@@ -63,11 +63,6 @@ def patched_dependencies(monkeypatch):
     monkeypatch.setattr(rag_module, "TextAnalysisTool", StubTextAnalysisTool)
     monkeypatch.setattr(
         rag_module,
-        "relevance_ranking_chat_template",
-        types.SimpleNamespace(format_messages=lambda **_: []),
-    )
-    monkeypatch.setattr(
-        rag_module,
         "rag_ar_template",
         types.SimpleNamespace(format_messages=lambda **_: "rag-ar-prompt"),
     )

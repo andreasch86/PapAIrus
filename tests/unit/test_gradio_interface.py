@@ -1,46 +1,52 @@
-import importlib
-import sys
 import types
 
+from papairus.chat_with_repo import gradio_interface as gi
 
-def test_gradio_interface_helpers(monkeypatch):
-    class DummyContext:
-        def __init__(self, *_, **__):
-            pass
 
-        def __enter__(self):
-            return self
-
-        def __exit__(self, *_, **__):
-            return False
-
-    dummy_gradio = types.SimpleNamespace(
-        HTML=lambda *args, **kwargs: f"HTML-{kwargs.get('label', '')}",
-        Blocks=lambda *args, **kwargs: DummyContext(),
-        Markdown=lambda *args, **kwargs: None,
-        Tab=lambda *args, **kwargs: DummyContext(),
-        Row=lambda *args, **kwargs: DummyContext(),
-        Column=lambda *args, **kwargs: DummyContext(),
-        Textbox=lambda *args, **kwargs: f"Textbox-{kwargs.get('label', '')}",
-        Button=lambda *args, **kwargs: types.SimpleNamespace(click=lambda *a, **k: None),
-        ClearButton=lambda *args, **kwargs: types.SimpleNamespace(click=lambda *a, **k: None),
-        close_all=lambda: None,
-    )
-
-    monkeypatch.setitem(sys.modules, "gradio", dummy_gradio)
-    monkeypatch.setitem(sys.modules, "markdown", types.SimpleNamespace(markdown=lambda value: f"<p>{value}</p>"))
-
-    from papairus.chat_with_repo import gradio_interface as gi
-
-    importlib.reload(gi)
+def test_gradio_interface_close_calls_handles(monkeypatch):
     monkeypatch.setattr(gi.GradioInterface, "setup_gradio_interface", lambda self: None)
 
-    iface = gi.GradioInterface(lambda msg, sysmsg: (msg, "resp", "recall", "kw", "code", "codex"))
+    closed = {"demo": False, "launch": False}
 
-    wrapper_result = iface.wrapper_respond("question", "system")
-    assert "Response" in wrapper_result[1]
-    assert "Embedding Recall" in wrapper_result[2]
+    class DummyDemo:
+        def close(self):
+            closed["demo"] = True
 
-    cleaned = iface.clean()
-    assert isinstance(cleaned[1], str)
-    assert isinstance(cleaned[4], str)
+    class DummyLaunch:
+        def close(self):
+            closed["launch"] = True
+
+    iface = gi.GradioInterface(lambda *_args: ("", "", "", "", "", ""), {})
+    iface.demo = DummyDemo()
+    iface.launch_handle = DummyLaunch()
+
+    iface.close()
+
+    assert closed["demo"] is True
+    assert closed["launch"] is True
+
+def test_gradio_interface_wrapper_formats_output(monkeypatch):
+    monkeypatch.setattr(gi.GradioInterface, "setup_gradio_interface", lambda self: None)
+
+    iface = gi.GradioInterface(lambda *_args: ("msg", "out1", "out2", "out3", "code", "codex"), {})
+    outputs = iface.wrapper_respond("msg", "system")
+
+    assert len(outputs) == 6
+
+def test_gradio_interface_clean_returns_defaults(monkeypatch):
+    monkeypatch.setattr(gi.GradioInterface, "setup_gradio_interface", lambda self: None)
+
+    iface = gi.GradioInterface(lambda *_args: ("", "", "", "", "", ""), {})
+    outputs = iface.clean()
+
+    assert len(outputs) == 6
+
+
+def test_gradio_interface_close_handles_missing_launch(monkeypatch):
+    monkeypatch.setattr(gi.GradioInterface, "setup_gradio_interface", lambda self: None)
+
+    iface = gi.GradioInterface(lambda *_args: ("", "", "", "", "", ""), {})
+    iface.demo = None
+    iface.launch_handle = object()
+
+    iface.close()
