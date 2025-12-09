@@ -67,7 +67,7 @@ def test_main_skips_creation_if_hash_matches(monkeypatch, tmp_path):
     def fake_get_setting():
         return Setting(
             project=ProjectSettings(target_repo=tmp_path),
-            chat_completion=ChatCompletionSettings(model="local-gemma"),
+            chat_completion=ChatCompletionSettings(model="codegemma"),
         )
 
     monkeypatch.setattr(SettingsManager, "get_setting", staticmethod(fake_get_setting))
@@ -111,3 +111,56 @@ def test_main_skips_creation_if_hash_matches(monkeypatch, tmp_path):
 
     assert "created" not in calls
     assert "gradio" in calls
+
+
+def test_main_rebuilds_if_hash_mismatch(monkeypatch, tmp_path):
+    calls = {}
+
+    def fake_get_setting():
+        return Setting(
+            project=ProjectSettings(target_repo=tmp_path),
+            chat_completion=ChatCompletionSettings(model="codegemma"),
+        )
+
+    monkeypatch.setattr(SettingsManager, "get_setting", staticmethod(fake_get_setting))
+
+    class DummyAssistant:
+        def __init__(self, chat_settings, db_path):
+            self.chat_settings = chat_settings
+            self.db_path = db_path
+            self.json_data = types.SimpleNamespace(
+                extract_data=lambda: (["content"], [{"meta": True}])
+            )
+            self.vector_store_manager = types.SimpleNamespace(
+                create_vector_store=lambda *_args: calls.setdefault("created", True),
+                chroma_db_path=tmp_path / "chroma_db",
+            )
+
+        def respond(self, *_args, **_kwargs):
+            calls["respond"] = True
+
+    monkeypatch.setattr(chat_main_module, "RepoAssistant", DummyAssistant)
+
+    class DummyGradio:
+        def __init__(self, callback):
+            calls["gradio"] = callback
+
+    monkeypatch.setattr(chat_main_module, "GradioInterface", DummyGradio)
+
+    # Setup files with mismatching hash
+    db_path = tmp_path / ".project_doc_record" / "project_hierarchy.json"
+    db_path.parent.mkdir(parents=True, exist_ok=True)
+    db_path.write_text("new content")
+
+    chroma_path = tmp_path / "chroma_db"
+    chroma_path.mkdir(parents=True, exist_ok=True)
+    (chroma_path / "vector_store_hash.txt").write_text("old hash")
+
+    chat_main_module.main()
+
+    assert calls["created"] is True
+
+    # Verify hash is updated
+    import hashlib
+    new_hash = hashlib.md5(b"new content").hexdigest()
+    assert (chroma_path / "vector_store_hash.txt").read_text() == new_hash
