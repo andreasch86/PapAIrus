@@ -79,6 +79,10 @@ class DummyVectorStoreIndex:
         self.storage_context = storage_context
         self.embed_model = embed_model
 
+    @classmethod
+    def from_vector_store(cls, vector_store=None, embed_model=None):
+        return cls(nodes=[], embed_model=embed_model)
+
 
 class DummyRetriever:
     def __init__(self, index=None, similarity_top_k=None, embed_model=None):
@@ -1770,3 +1774,70 @@ def test_create_vector_store_raises_on_process_failure(monkeypatch, patched_mana
         patched_manager.create_vector_store(["text"], [{}])
 
 
+
+def test_create_vector_store_handles_all_empty_chunks_with_existing_index(monkeypatch, patched_manager):
+    class CustomPersistentClient:
+        def __init__(self, path):
+            pass
+        def get_or_create_collection(self, name):
+            collection = DummyCollection(name)
+            collection.get = lambda *args, **kwargs: {"ids": ["existing-hash"]}
+            return collection
+
+    monkeypatch.setattr(
+        "papairus.chat_with_repo.vector_store_manager.chromadb.PersistentClient",
+        CustomPersistentClient
+    )
+
+    class EmptySplitter:
+        def __init__(self, *args, **kwargs):
+            pass
+        def get_nodes_from_documents(self, docs):
+            return []
+
+    monkeypatch.setattr(
+        "papairus.chat_with_repo.vector_store_manager.SemanticSplitterNodeParser",
+        EmptySplitter
+    )
+    monkeypatch.setattr(
+        "papairus.chat_with_repo.vector_store_manager.SentenceSplitter",
+        EmptySplitter
+    )
+
+    patched_manager.create_vector_store(["content"], [{"source": "test"}])
+
+    assert patched_manager.query_engine is not None
+
+def test_create_vector_store_raises_on_unknown_embedding_error(monkeypatch, patched_manager):
+    def failing_index(*args, **kwargs):
+        raise ValueError("Unknown error")
+
+    monkeypatch.setattr(
+        "papairus.chat_with_repo.vector_store_manager.VectorStoreIndex", failing_index
+    )
+
+    with pytest.raises(ValueError, match="Unknown error"):
+        patched_manager.create_vector_store(["content"], [{"source": "test"}])
+
+def test_create_vector_store_reloads_existing_index(monkeypatch, patched_manager):
+    import hashlib
+    content = "content"
+    meta = {"source": "test"}
+    doc_hash = hashlib.sha256((content + str(meta)).encode("utf-8")).hexdigest()
+
+    class CustomPersistentClient:
+        def __init__(self, path):
+            pass
+        def get_or_create_collection(self, name):
+            collection = DummyCollection(name)
+            collection.get = lambda *args, **kwargs: {"ids": [doc_hash]}
+            return collection
+
+    monkeypatch.setattr(
+        "papairus.chat_with_repo.vector_store_manager.chromadb.PersistentClient",
+        CustomPersistentClient
+    )
+
+    patched_manager.create_vector_store([content], [meta])
+
+    assert patched_manager.query_engine is not None
