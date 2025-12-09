@@ -1,21 +1,21 @@
 class Arithmetic:
     """
-    A class for performing arithmetic operations.
+    Class to perform arithmetic operations on two numbers.
     
     Args:
-        a (int): The first operand.
-        b (int): The second operand.
+        a: The first number.
+        b: The second number.
     
     Attributes:
-        a (int): The first operand.
-        b (int): The second operand.
+        a: The first number.
+        b: The second number.
     
     Methods:
-        add(): Returns the sum of a and b.
-        sub(): Returns the difference of a and b.
-        mul(): Returns the product of a and b.
-        div(): Returns the quotient of a and b.
-        mod(): Returns the modulo of a and b.
+        add(): Returns the sum of the two numbers.
+        sub(): Returns the difference of the two numbers.
+        mul(): Returns the product of the two numbers.
+        div(): Returns the quotient of the two numbers.
+        mod(): Returns the remainder of the division of the two numbers.
     """
     a: int
     b: int
@@ -25,64 +25,49 @@ class Arithmetic:
 
     def add(self):
         """
-        Adds two numbers.
+        Returns the sum of the two numbers.
         
         Args:
-            self: The object instance.
-            a: The first number.
-            b: The second number.
+            self: The Arithmetic object.
         
         Returns:
-            The sum of a and b.
-        
-        Raises:
-            None
+            The sum of the two numbers.
         """
         return self.a + self.b
 
     def sub(self):
         """
-        Subtracts self.b from self.a.
+        Returns the difference of the two numbers.
         
         Args:
-            self: The instance of the class.
+            self: The Arithmetic object.
         
         Returns:
-            The difference between self.a and self.b.
-        
-        Raises:
-            None
+            The difference of the two numbers.
         """
         return self.a - self.b
 
     def mul(self):
         """
-        Multiplies two numbers.
+        Returns the product of the two numbers.
         
         Args:
-            self: The object instance.
-            a (float): The first number.
-            b (float): The second number.
+            self: The Arithmetic object.
         
         Returns:
-            float: The product of a and b.
-        
-        Raises:
-            None
+            The product of the two numbers.
         """
         return self.a * self.b
 
     def div(self):
         """
-        Divides two numbers.
+        Returns the quotient of the two numbers.
         
         Args:
-            self: The object instance.
-            a: The first number.
-            b: The second number.
+            self: The Arithmetic object.
         
         Returns:
-            The result of the division.
+            The quotient of the two numbers.
         
         Raises:
             ZeroDivisionError: If the divisor is zero.
@@ -95,22 +80,8 @@ class Arithmetic:
         return c
 
     def mod(self):
-        """
-        Calculates the modulo of two numbers.
-        
-        Args:
-            self: The object instance.
-            a: The first number.
-            b: The second number.
-        
-        Returns:
-            The modulo of a and b.
-        
-        Raises:
-            ZeroDivisionError: If b is 0.
-        """
         try:
-            c = float(self.a % self.b)
+            m = float(self.a % self.b)
         except ZeroDivisionError:
             raise ZeroDivisionError("Cannot divide by zero")
-        return c
+        return m

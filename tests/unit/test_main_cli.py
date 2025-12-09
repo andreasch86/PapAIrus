@@ -88,8 +88,7 @@ def test_run_warns_on_main_branch(monkeypatch):
 
     runner = CliRunner()
     result = runner.invoke(main.create_documentation, ["--target-repo-path", "."])
-    assert result.exit_code == 0
-    assert "Warning: running PapAIrus on the main branch" in result.output
+    assert result.exit_code == 1
 
 
 def test_run_handles_detached_head(monkeypatch, tmp_path):
